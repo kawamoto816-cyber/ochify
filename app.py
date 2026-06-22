@@ -6,20 +6,27 @@ st.set_page_config(page_title="Ochify | World Peace through Comedy", page_icon="
 
 st.markdown("""
 <style>
+    /* 🐈 右上のGitHubアイコンやメニューを完全に隠す！ */
+    [data-testid="stToolbar"] {visibility: hidden !important;}
+    header {visibility: hidden !important;}
+
     .main {max-width: 500px; margin: 0 auto;}
-    .post-card {background-color: #ffffff; border-radius: 15px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); border: 1px solid #eee;}
-    .my-post {border: 2px solid #4b8bff; background-color: #f8fbff;}
-    .main-text {font-size: 1.2rem; font-weight: bold; color: #333; margin-bottom: 10px;}
-    .preview-box {border: 2px dashed #ff4b4b; border-radius: 10px; padding: 15px; margin-top: 20px; background-color: #fffaf0;}
-    .task-box {background-color: #e6f3ff; border-radius: 10px; padding: 15px; margin-top: 10px; border: 1px solid #b3d9ff; margin-bottom: 15px;}
-    .chat-bubble-me {background-color: #DCF8C6; padding: 10px 15px; border-radius: 20px; margin-bottom: 10px; text-align: right; width: fit-content; margin-left: auto;}
-    .chat-bubble-other {background-color: #F1F0F0; padding: 10px 15px; border-radius: 20px; margin-bottom: 10px; width: fit-content;}
+    /* 🌙 ダークモード対応：背景色を透明にしてスマホの設定に合わせる。文字色固定(#333)を削除 */
+    .post-card {background-color: transparent; border-radius: 15px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(128,128,128,0.1); border: 1px solid rgba(128,128,128,0.3);}
+    .my-post {border: 2px solid #4b8bff; background-color: rgba(75, 139, 255, 0.05);}
+    .main-text {font-size: 1.2rem; font-weight: bold; margin-bottom: 10px;}
+    .preview-box {border: 2px dashed #ff4b4b; border-radius: 10px; padding: 15px; margin-top: 20px; background-color: transparent;}
+    .task-box {background-color: transparent; border-radius: 10px; padding: 15px; margin-top: 10px; border: 1px solid #b3d9ff; margin-bottom: 15px;}
+    
+    /* 💬 チャットの吹き出し：背景が明るいので、文字は強制的に黒色(#111)に固定して読みやすくする */
+    .chat-bubble-me {background-color: #DCF8C6; color: #111 !important; padding: 10px 15px; border-radius: 20px; margin-bottom: 10px; text-align: right; width: fit-content; margin-left: auto; font-weight: bold;}
+    .chat-bubble-other {background-color: #F1F0F0; color: #111 !important; padding: 10px 15px; border-radius: 20px; margin-bottom: 10px; width: fit-content; font-weight: bold;}
+    
     .goal-badge {background-color: #ff4b4b; color: white; padding: 5px 10px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; display: inline-block; margin-bottom: 10px;}
     .stTabs [data-baseweb="tab-list"] button {font-weight: bold; font-size: 1.05rem;}
     
-    /* 🌟 アプリ名ロゴとビジョンのスタイル */
     .app-title {font-size: 2.8rem; font-weight: 900; background: -webkit-linear-gradient(45deg, #ff4b4b, #ff904b); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0px; padding-bottom: 0px; letter-spacing: -1px;}
-    .app-subtitle {font-size: 0.95rem; color: #666; font-style: italic; margin-top: -5px; margin-bottom: 20px;}
+    .app-subtitle {font-size: 0.95rem; color: #888; font-style: italic; margin-top: -5px; margin-bottom: 20px;}
 </style>
 """, unsafe_allow_html=True)
 
@@ -91,7 +98,7 @@ if page_index == 0:
     
     with tab1:
         st.text_area(t("オチのない普通の出来事を書いてや！", "Write an ordinary event with no punchline!"), key="input_text", height=100)
-        st.markdown(t("<p style='font-size:0.9rem; font-weight:bold; color:#555; margin-top:10px;'>🎭 どんなテイストでオチファイする？</p>", "<p style='font-size:0.9rem; font-weight:bold; color:#555; margin-top:10px;'>🎭 Choose Comedy Style</p>"), unsafe_allow_html=True)
+        st.markdown(t("<p style='font-size:0.9rem; font-weight:bold; color:#888; margin-top:10px;'>🎭 どんなテイストでオチファイする？</p>", "<p style='font-size:0.9rem; font-weight:bold; color:#888; margin-top:10px;'>🎭 Choose Comedy Style</p>"), unsafe_allow_html=True)
         boke_type = st.radio("Style", [t("💥 誇張（話を盛る）", "💥 Exaggeration"), t("😭 自虐（悲しいけど笑える）", "😭 Self-deprecating"), t("🤪 勘違い（すっとぼけ）", "🤪 Misunderstanding")], horizontal=True, label_visibility="collapsed")
         
         internal_boke_type = "誇張" if "💥" in boke_type else "自虐" if "😭" in boke_type else "勘違い"
@@ -236,12 +243,11 @@ elif page_index == 1:
                     post_id = post.get("id")
                     is_mine = (post.get("author_id") == st.session_state.user_id)
                     author_name = boke.get("author_name", t("見知らぬユーザー", "Unknown User"))
-                    bg_color = "#ffffff" if not is_mine else "#f4f9ff"
                     
-                    st.markdown(f'<div class="post-card" style="background-color: {bg_color};">', unsafe_allow_html=True)
+                    st.markdown(f'<div class="post-card" class="{"my-post" if is_mine else ""}">', unsafe_allow_html=True)
                     
                     if is_mine:
-                        st.markdown(f"👤 **{author_name} ({t('あなた', 'You')})** <span style='color:green; font-weight:bold; font-size:0.8rem;'>・{t('自分の投稿', 'Your Post')}</span>", unsafe_allow_html=True)
+                        st.markdown(f"👤 **{author_name} ({t('あなた', 'You')})** <span style='color:#4b8bff; font-weight:bold; font-size:0.8rem;'>・{t('自分の投稿', 'Your Post')}</span>", unsafe_allow_html=True)
                     else:
                         st.markdown(f"👤 **{author_name}** <span style='color:gray; font-size:0.8rem;'>・Ochify</span>", unsafe_allow_html=True)
                     st.markdown("<br>", unsafe_allow_html=True)
@@ -281,6 +287,9 @@ elif page_index == 1:
                     st.markdown('</div>', unsafe_allow_html=True)
         except Exception as e: st.error("Error loading feed.")
 
+# ==========================================
+# 💬 DMルーム
+# ==========================================
 elif page_index == 2:
     st.title(t("💬 DMルーム", "💬 DM Room"))
     if not st.session_state.dm_history: st.info(t("まだ誰ともチャットしていません。", "No chats yet."))
@@ -292,5 +301,11 @@ elif page_index == 2:
                 st.markdown(f"<div class='chat-bubble-me'>{t('あなた', 'You')}: {dm['me']}</div>", unsafe_allow_html=True)
                 st.markdown(f"<div class='chat-bubble-other'>{t('相手', 'Them')}: {dm['other']}</div>", unsafe_allow_html=True)
             st.markdown("---")
-            st.text_input(t("メッセージを送信...", "Send message..."), placeholder="※Mock")
-            st.button(t("送信", "Send"), type="primary")
+            
+            # 🌟 送信ボタンが動くように修正（モック）
+            dm_input = st.text_input(t("メッセージを送信...", "Send message..."), key="dm_input_text")
+            if st.button(t("送信", "Send"), type="primary", use_container_width=True):
+                if dm_input:
+                    # 自分が打った文字と、AIのダミー返信を追加
+                    st.session_state.dm_history.append({"me": dm_input, "other": t("ほんまそれな！笑（※体験版の自動返信です）", "Exactly! lol (Mock reply)")})
+                    st.rerun()
