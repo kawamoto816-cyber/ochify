@@ -6,16 +6,20 @@ st.set_page_config(page_title="Ochify | World Peace through Comedy", page_icon="
 
 st.markdown("""
 <style>
-    /* 📱 修正: メニュー（⋮ や ≡）は残し、右上に出る「Deploy」や「GitHubリンク」だけをピンポイントで消す */
+    /* 📱 メニュー（≡ や ⋮）は絶対に死守し、右上に出る「Deploy」「GitHub」「Fork」だけを消す！ */
     .stAppDeployButton {display: none !important;}
     header[data-testid="stHeader"] a {display: none !important;}
+    [data-testid="stToolbar"] a {display: none !important;}
+    [data-testid="stToolbar"] button[title*="Fork"] {display: none !important;}
+    [data-testid="stToolbar"] button[title*="GitHub"] {display: none !important;}
+    [data-testid="stToolbar"] button[aria-label*="Fork"] {display: none !important;}
+    [data-testid="stToolbar"] button[aria-label*="GitHub"] {display: none !important;}
 
     /* 👑 右下のStreamlitフッターや王冠バッジ（Manage app）を強制的に消す */
     footer {display: none !important;}
     [data-testid="manage-app-button"] {display: none !important;}
-    .viewerBadge_container__1QSob {display: none !important;}
-    .viewerBadge_container__1JCIV {display: none !important;}
-    .viewerBadge_link__1S137 {display: none !important;}
+    div[class^="viewerBadge"] {display: none !important;}
+    [id^="viewerBadge"] {display: none !important;}
 
     .main {max-width: 500px; margin: 0 auto;}
     /* 🌙 ダークモード対応 */
@@ -68,7 +72,7 @@ def handle_api_error(res):
 if "user_id" not in st.session_state:
     with st.spinner(t("🚀 アカウントを自動生成中...", "🚀 Booting...")):
         try:
-            res = requests.post(f"{API_URL}/init-user", timeout=10) # 修正: api不要な場合もあるが統一
+            res = requests.post(f"{API_URL}/api/init-user", timeout=10)
             if res.status_code == 200:
                 data = res.json()
                 st.session_state.user_id = data.get("user_id")
