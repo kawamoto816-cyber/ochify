@@ -6,9 +6,15 @@ st.set_page_config(page_title="Ochify | World Peace through Comedy", page_icon="
 
 st.markdown("""
 <style>
-    /* 👑 右下のStreamlitフッターを消す */
-    footer {display: none !important;}
+    /* 📱 【究極魔法】右上のエリア（Fork, GitHub, ⋮）をコンテナごと物理的に破壊し、左上の「＞＞」だけを残す！ */
+    [data-testid="stToolbar"] { display: none !important; }
+    [data-testid="stHeaderActionElements"] { display: none !important; }
+    .stAppDeployButton { display: none !important; }
+    header[data-testid="stHeader"] { background: transparent !important; }
 
+    /* 👑 右下のStreamlitフッターや不要な帯を完全に消去 */
+    footer {display: none !important;}
+    
     .main {max-width: 500px; margin: 0 auto;}
     /* 🌙 ダークモード対応 */
     .post-card {background-color: transparent; border-radius: 15px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(128,128,128,0.1); border: 1px solid rgba(128,128,128,0.3);}
@@ -43,7 +49,6 @@ if selected_lang != st.session_state.lang:
 is_ja = (st.session_state.lang == "ja")
 def t(ja_text, en_text): return ja_text if is_ja else en_text
 
-# --- 🚨 AIエラーとDBエラーを優しく翻訳する関数 ---
 def handle_api_error(res):
     try:
         error_detail = res.json().get('detail', res.text)
@@ -51,7 +56,7 @@ def handle_api_error(res):
         error_detail = res.text
         
     if "503" in error_detail or "UNAVAILABLE" in error_detail or "high demand" in error_detail:
-        st.error(t("⚠️ 現在、GoogleのAIサーバーが世界的なアクセス集中で大混雑しています！数秒待ってからもう一度お試しください🙏", "⚠️ Google AI server is currently experiencing high demand. Please try again in a few seconds🙏"))
+        st.error(t("⚠️ 現在、GoogleのAIサーバーが大混雑しています！数秒待ってからもう一度お試しください🙏", "⚠️ Google AI server is currently experiencing high demand. Please try again in a few seconds🙏"))
     elif "boke_posts" in error_detail or "posts" in error_detail:
         st.error(t(f"データベース設定エラー: {error_detail}", f"DB Schema Error: {error_detail}"))
     else:
@@ -103,9 +108,7 @@ st.markdown(f'<div class="app-subtitle">{t("大阪のお笑いコミュニケー
 
 def render_post_card(post, is_trend=False, rank=0):
     boke = post.get("boke_data")
-    if not isinstance(boke, dict):
-        boke = {}
-        
+    if not isinstance(boke, dict): boke = {}
     post_id = str(post.get("id"))
     is_mine = (post.get("author_id") == st.session_state.user_id)
     author_name = post.get("author_name") or boke.get("author_name") or t("見知らぬユーザー", "Unknown User")
@@ -117,7 +120,6 @@ def render_post_card(post, is_trend=False, rank=0):
         st.session_state.ndy_counts[post_id] = local_count
 
     st.markdown(f'<div class="post-card {"my-post" if is_mine else ""}">', unsafe_allow_html=True)
-    
     if is_trend:
         medal = "🥇" if rank==1 else "🥈" if rank==2 else "🥉" if rank==3 else f"{rank}位"
         st.markdown(f"### {medal}", unsafe_allow_html=True)
@@ -135,9 +137,7 @@ def render_post_card(post, is_trend=False, rank=0):
         st.markdown("<br>", unsafe_allow_html=True)
         
     display_text = boke.get('boke_jp', '') if is_ja else boke.get('boke_en', '')
-    if not display_text:
-        display_text = t("（この投稿は現在表示できません）", "(Post not available)")
-        
+    if not display_text: display_text = t("（この投稿は現在表示できません）", "(Post not available)")
     st.markdown(f'<div class="main-text">{"🇯🇵" if is_ja else "🌍"} {display_text}</div>', unsafe_allow_html=True)
     
     if is_mine:
@@ -145,7 +145,6 @@ def render_post_card(post, is_trend=False, rank=0):
         st.button(f"✋ {t('なんでやねん！', 'Nandeyanen!')} ({local_count})", key=f"nande_mine_{post_id}_{is_trend}", disabled=True)
     else:
         st.markdown(f"<p style='font-size:0.8rem; color:#888; margin-top:10px;'>👇 {t('いいねの代わりに愛のあるツッコミを！', 'Send Nandeyanen instead of Like!')}</p>", unsafe_allow_html=True)
-        
         c1, c2 = st.columns([1, 1.5])
         with c1:
             if st.button(f"✋ {t('なんでやねん！', 'Nandeyanen!')} ({local_count})", key=f"nande_{post_id}_{is_trend}"):
@@ -153,7 +152,6 @@ def render_post_card(post, is_trend=False, rank=0):
                 try: requests.post(f"{API_URL}/api/nandeyanen/{post_id}", timeout=2)
                 except: pass
                 st.rerun()
-                
         with c2:
             with st.expander(t("💬 DMで直接ツッコむ", "💬 Reply in DM")):
                 t1, t2, t3 = boke.get('tsukkomi_1',{}), boke.get('tsukkomi_2',{}), boke.get('tsukkomi_3',{})
@@ -176,7 +174,6 @@ if page_index == 0:
         st.markdown(t("<p style='font-size:0.9rem; font-weight:bold; color:#888; margin-top:10px;'>🎭 どんなテイストでオチファイする？</p>", "<p style='font-size:0.9rem; font-weight:bold; color:#888; margin-top:10px;'>🎭 Choose Comedy Style</p>"), unsafe_allow_html=True)
         boke_type = st.radio("Style", [t("💥 誇張（話を盛る）", "💥 Exaggeration"), t("😭 自虐（悲しいけど笑える）", "😭 Self-deprecating"), t("🤪 勘違い（すっとぼけ）", "🤪 Misunderstanding")], horizontal=True, label_visibility="collapsed")
         internal_boke_type = "誇張" if "💥" in boke_type else "自虐" if "😭" in boke_type else "勘違い"
-        
         if st.button(t("✨ ① オチファイする", "✨ 1. Ochify it!"), key="b1", use_container_width=True):
             if st.session_state.input_text:
                 success = False
@@ -254,12 +251,8 @@ if page_index == 0:
         boke = st.session_state.preview_data
         st.markdown('<div class="preview-box">', unsafe_allow_html=True)
         st.markdown(t("#### 💡 プレビュー (未公開)", "#### 💡 Preview (Private)"))
-        
-        if boke.get("type") == "yumeochi":
-            st.markdown(f'<div class="goal-badge">🎯 {t("目標", "Goal")}: {boke.get("goal")}</div>', unsafe_allow_html=True)
-        if boke.get("type") == "image" and "image_url" in boke: 
-            st.image(boke["image_url"], use_container_width=True)
-            
+        if boke.get("type") == "yumeochi": st.markdown(f'<div class="goal-badge">🎯 {t("目標", "Goal")}: {boke.get("goal")}</div>', unsafe_allow_html=True)
+        if boke.get("type") == "image" and "image_url" in boke: st.image(boke["image_url"], use_container_width=True)
         display_text = boke.get('boke_jp', '') if is_ja else boke.get('boke_en', '')
         st.markdown(f'<div class="main-text">{"🇯🇵" if is_ja else "🌍"} {display_text}</div>', unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
@@ -277,14 +270,13 @@ if page_index == 0:
                             "boke_vector": st.session_state.preview_vector
                         }
                         res = requests.post(f"{API_URL}/api/publish", json=payload, timeout=10)
-                        if res.status_code == 200:
-                            success = True
+                        if res.status_code == 200: success = True
                         else: handle_api_error(res)
                     except Exception as e: st.error(f"通信エラー: {e}")
                 if success:
                     st.session_state.preview_data = None
                     st.session_state.preview_vector = None
-                    st.toast(t("🎉 投稿完了！閲覧者側フィードに移動します。", "🎉 Published! Moving to Feed."), icon="✅")
+                    st.toast(t("🎉 投稿完了！", "🎉 Published!"), icon="✅")
                     time.sleep(1.5)
                     st.session_state.current_page = pages[1]
                     st.rerun()
@@ -305,7 +297,7 @@ elif page_index == 1:
                 else:
                     for post in posts:
                         try: render_post_card(post, is_trend=False)
-                        except Exception as e: st.warning(f"一部の投稿をスキップしました (データ不具合): {e}")
+                        except: pass
             else: handle_api_error(feed_res)
         except Exception as e: st.error(f"通信エラー: {e}")
 
@@ -319,11 +311,11 @@ elif page_index == 2:
             if trend_res.status_code == 200:
                 posts = trend_res.json().get("posts", [])
                 ranked_posts = [p for p in posts if (p.get("nandeyanen_count") or 0) > 0 or st.session_state.ndy_counts.get(str(p.get("id")), 0) > 0]
-                if not ranked_posts: st.info(t("まだ誰も「なんでやねん」されていません！フィードでツッコミを入れてみよう。", "No Nandeyanen yet. Go to Feed and react!"))
+                if not ranked_posts: st.info(t("まだ誰も「なんでやねん」されていません！", "No Nandeyanen yet."))
                 else:
                     for i, post in enumerate(ranked_posts[:10]):
                         try: render_post_card(post, is_trend=True, rank=i+1)
-                        except Exception as e: pass
+                        except: pass
             else: handle_api_error(trend_res)
         except Exception as e: st.error(f"通信エラー: {e}")
 
