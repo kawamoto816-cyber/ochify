@@ -39,7 +39,10 @@ if "username" not in st.session_state: st.session_state.username = "Unknown"
 if "current_page" not in st.session_state: st.session_state.current_page = "✍️ 投稿"
 if "preview_data" not in st.session_state: st.session_state.preview_data = None
 if "preview_vector" not in st.session_state: st.session_state.preview_vector = None
-if "dm_history" not in st.session_state: st.session_state.dm_history = []
+
+# 🚨 偽物の履歴(dm_history)を廃止し、本物のチャット相手を保存する箱を作る
+if "chat_target" not in st.session_state: st.session_state.chat_target = None 
+
 if "input_text" not in st.session_state: st.session_state.input_text = "" 
 if "yume_step" not in st.session_state: st.session_state.yume_step = 1
 if "my_goal" not in st.session_state: st.session_state.my_goal = ""
@@ -50,7 +53,6 @@ if "ndy_counts" not in st.session_state: st.session_state.ndy_counts = {}
 is_ja = (st.session_state.lang == "ja")
 def t(ja_text, en_text): return ja_text if is_ja else en_text
 
-# 🚨 【修正】"503" の部分一致をやめ、真のエラーを隠さずに表示する！
 def handle_api_error(res):
     try: error_detail = res.json().get('detail', res.text)
     except: error_detail = res.text
@@ -113,7 +115,8 @@ def render_post_card(post, is_trend=False, rank=0):
     boke = post.get("boke_data")
     if not isinstance(boke, dict): boke = {}
     post_id = str(post.get("id"))
-    is_mine = (post.get("author_id") == st.session_state.user_id)
+    author_id = str(post.get("author_id"))
+    is_mine = (author_id == st.session_state.user_id)
     author_name = post.get("author_name") or boke.get("author_name") or t("見知らぬユーザー", "Unknown User")
     
     db_count = post.get("nandeyanen_count") or 0
@@ -155,10 +158,25 @@ def render_post_card(post, is_trend=False, rank=0):
         with c2:
             with st.expander(t("💬 DMで直接ツッコむ", "💬 Reply in DM")):
                 t1, t2, t3 = boke.get('tsukkomi_1',{}), boke.get('tsukkomi_2',{}), boke.get('tsukkomi_3',{})
+                
+                # 🚨 【修正】本物のDBに最初のツッコミを送信して、DM画面へ飛ぶ
                 def start_dm(tsukkomi_text):
+                    if target_id == st.session_state.user_id:
+                        st.toast(t("自分にはツッコめません！", "Cannot react to yourself!"))
+                        return
                     if tsukkomi_text:
-                        st.session_state.dm_history.append({"me": tsukkomi_text, "other": t("なんでやねん！笑", "Lol, what!")})
+                        st.session_state.chat_target = {"id": author_id, "name": author_name}
+                        payload = {
+                            "sender_id": st.session_state.user_id,
+                            "receiver_id": author_id,
+                            "sender_name": st.session_state.username,
+                            "receiver_name": author_name,
+                            "message_text": f"【ツッコミ】{tsukkomi_text}"
+                        }
+                        try: requests.post(f"{API_URL}/api/send-message", json=payload, timeout=5)
+                        except: pass
                         st.session_state.current_page = pages[3]
+                        
                 b1_txt = t1.get('jp','') if is_ja else t1.get('en','')
                 b2_txt = t2.get('jp','') if is_ja else t2.get('en','')
                 b3_txt = t3.get('jp','') if is_ja else t3.get('en','')
@@ -302,12 +320,12 @@ elif page_index == 1:
                 else:
                     for post in posts:
                         try: render_post_card(post, is_trend=False)
-                        except Exception as e: st.warning(f"一部の投稿をスキップしました (データ不具合): {e}")
+                        except Exception as e: pass
             else: handle_api_error(feed_res)
         except Exception as e: st.error(f"通信エラー: {e}")
 
 elif page_index == 2:
-    st.title(t("👑 トレンド", "👑 Trending"))
+    st.markdown(t("### 👑 トレンド", "### 👑 Trending"))
     st.write(t("世界中で一番「なんでやねん！」を集めている猛者たちです。", "The most 'Nandeyanen!' posts in the world."))
     if st.button(t("🔄 ランキングを更新", "🔄 Refresh Ranking"), use_container_width=True): st.rerun()
     with st.spinner(t("ランキングを集計中...", "Calculating trends...")):
@@ -324,19 +342,91 @@ elif page_index == 2:
             else: handle_api_error(trend_res)
         except Exception as e: st.error(f"通信エラー: {e}")
 
+# ==========================================
+# 🚨 【修正】本物のDMルーム！
+# ==========================================
 elif page_index == 3:
-    st.title(t("💬 DMルーム", "💬 DM Room"))
-    if not st.session_state.dm_history: st.info(t("まだ誰ともチャットしていません。", "No chats yet."))
+    st.markdown(t("### 💬 DMルーム", "### 💬 DM Room"))
+    
+    # 1. APIから自分のメッセージ履歴を取得
+    messages = []
+    try:
+        res = requests.get(f"{API_URL}/api/messages/{st.session_state.user_id}", timeout=10)
+        if res.status_code == 200:
+            messages = res.json().get("messages", [])
+    except: pass
+        
+    # 2. 履歴から「チャットしたことのある相手」のリストを作る
+    contacts = {}
+    for m in messages:
+        if m["sender_id"] != st.session_state.user_id:
+            contacts[m["sender_id"]] = m["sender_name"]
+        if m["receiver_id"] != st.session_state.user_id:
+            contacts[m["receiver_id"]] = m["receiver_name"]
+            
+    # 3. フィードのツッコミから飛んできた場合、履歴がなくても相手をリストに追加
+    if st.session_state.chat_target:
+        tgt_id = st.session_state.chat_target["id"]
+        if tgt_id not in contacts:
+            contacts[tgt_id] = st.session_state.chat_target["name"]
+
+    if not contacts:
+        st.info(t("まだ誰ともチャットしていません。フィードで誰かの投稿にツッコミを入れてみましょう！", "No chats yet. React to a feed post!"))
     else:
-        with st.container(border=True):
-            st.markdown(t("👤 **見知らぬ相手**", "👤 **Stranger**"))
-            st.markdown("---")
-            for dm in st.session_state.dm_history:
-                st.markdown(f"<div class='chat-bubble-me'>{t('あなた', 'You')}: {dm['me']}</div>", unsafe_allow_html=True)
-                st.markdown(f"<div class='chat-bubble-other'>{t('相手', 'Them')}: {dm['other']}</div>", unsafe_allow_html=True)
-            st.markdown("---")
-            dm_input = st.text_input(t("メッセージを送信...", "Send message..."), key="dm_input_text")
-            if st.button(t("送信", "Send"), type="primary", use_container_width=True):
-                if dm_input:
-                    st.session_state.dm_history.append({"me": dm_input, "other": t("ほんまそれな！笑（※体験版モック）", "Exactly! lol (Mock)")})
-                    st.rerun()
+        # 相手を選ぶプルダウンを作成
+        contact_options = [f"{v} (ID: {k[:4]})" for k, v in contacts.items()]
+        default_index = 0
+        if st.session_state.chat_target:
+            tgt_str = f"{st.session_state.chat_target['name']} (ID: {st.session_state.chat_target['id'][:4]})"
+            if tgt_str in contact_options:
+                default_index = contact_options.index(tgt_str)
+                
+        selected_contact_str = st.selectbox(t("📩 トーク相手を選択", "Select contact"), contact_options, index=default_index)
+        
+        target_id = None
+        for k, v in contacts.items():
+            if f"{v} (ID: {k[:4]})" == selected_contact_str:
+                target_id = k
+                break
+                
+        if target_id:
+            st.session_state.chat_target = {"id": target_id, "name": contacts[target_id]}
+            
+            c1, c2 = st.columns([3, 1])
+            with c2:
+                # 💡 手動の「更新ボタン」を用意
+                if st.button(t("🔄 更新", "Refresh"), use_container_width=True): st.rerun()
+            
+            with st.container(border=True):
+                st.markdown(f"👤 **{contacts[target_id]}**")
+                st.markdown("---")
+                
+                # 選んだ相手とのやりとりだけを抽出
+                chat_msgs = [m for m in messages if (m["sender_id"] == target_id and m["receiver_id"] == st.session_state.user_id) or (m["sender_id"] == st.session_state.user_id and m["receiver_id"] == target_id)]
+                
+                if not chat_msgs:
+                    st.write(t("まだメッセージはありません。", "No messages here."))
+                else:
+                    for m in chat_msgs:
+                        if m["sender_id"] == st.session_state.user_id:
+                            st.markdown(f"<div class='chat-bubble-me'>{m['message_text']}</div>", unsafe_allow_html=True)
+                        else:
+                            st.markdown(f"<div class='chat-bubble-other'>{m['message_text']}</div>", unsafe_allow_html=True)
+                        
+                st.markdown("---")
+                
+                # 💬 メッセージ送信フォーム（送信後に自動で文字が消える）
+                with st.form("dm_form", clear_on_submit=True):
+                    dm_input = st.text_input(t("メッセージを送信...", "Send message..."))
+                    submit_btn = st.form_submit_button(t("送信", "Send"), type="primary", use_container_width=True)
+                    if submit_btn and dm_input:
+                        payload = {
+                            "sender_id": st.session_state.user_id,
+                            "receiver_id": target_id,
+                            "sender_name": st.session_state.username,
+                            "receiver_name": contacts[target_id],
+                            "message_text": dm_input
+                        }
+                        try: requests.post(f"{API_URL}/api/send-message", json=payload, timeout=5)
+                        except: pass
+                        st.rerun()

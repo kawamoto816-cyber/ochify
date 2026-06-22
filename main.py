@@ -47,6 +47,14 @@ class YumeochiRequest(BaseModel):
     goal: str
     report: str
 
+# 🚨 新規追加：DMチャット用のモデル
+class MessageRequest(BaseModel):
+    sender_id: str
+    receiver_id: str
+    sender_name: str
+    receiver_name: str
+    message_text: str
+
 def get_boke_prompt(boke_type: str) -> str:
     prompts = {
         "誇張": "ユーザーの日常を、大阪のおばちゃん風に100倍くらい大げさに盛って面白くしてください。",
@@ -103,7 +111,6 @@ tsukkomi_1, tsukkomi_2, tsukkomi_3: (それに対する3つのツッコミの選
             config=types.GenerateContentConfig(system_instruction=sys_prompt, response_mime_type="application/json", response_schema=get_json_schema(), temperature=0.8)
         )
         data = json.loads(response.text)
-        # 🚨 ここを 768 次元に修正！
         return {"boke_data": data, "boke_vector": [0.0] * 768}
     except Exception as e:
         handle_ai_error(e)
@@ -131,7 +138,6 @@ tsukkomi_1, tsukkomi_2, tsukkomi_3: (ツッコミ選択肢 emoji, jp, en)
         supabase.storage.from_("ijiri_images").upload(file_name, img_bytes, {"content-type": file.content_type})
         public_url = supabase.storage.from_("ijiri_images").get_public_url(file_name)
         data["image_url"] = public_url
-        # 🚨 ここも 768 次元に修正！
         return {"boke_data": data, "boke_vector": [0.0] * 768}
     except Exception as e:
         handle_ai_error(e)
@@ -167,7 +173,6 @@ tsukkomi_1, tsukkomi_2, tsukkomi_3: (ツッコミ選択肢 emoji, jp, en)
         )
         data = json.loads(response.text)
         data["goal"] = req.goal
-        # 🚨 ここも 768 次元に修正！
         return {"boke_data": data, "boke_vector": [0.0] * 768}
     except Exception as e:
         handle_ai_error(e)
@@ -215,5 +220,30 @@ def add_nandeyanen(post_id: str):
             supabase.table("boke_posts").update({"nandeyanen_count": new_count}).eq("id", post_id).execute()
             return {"success": True, "new_count": new_count}
         return {"error": "post not found"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# 🚨 新規追加：本物のDM送受信API
+@app.post("/api/send-message")
+def send_message(req: MessageRequest):
+    try:
+        record = {
+            "sender_id": req.sender_id,
+            "receiver_id": req.receiver_id,
+            "sender_name": req.sender_name,
+            "receiver_name": req.receiver_name,
+            "message_text": req.message_text
+        }
+        supabase.table("messages").insert(record).execute()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/messages/{user_id}")
+def get_messages(user_id: str):
+    try:
+        # 自分に関係するメッセージをDBから全取得して古い順に並べる
+        res = supabase.table("messages").select("*").or_(f"sender_id.eq.{user_id},receiver_id.eq.{user_id}").order("created_at", desc=False).execute()
+        return {"messages": res.data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
