@@ -240,7 +240,6 @@ def publish(req: PublishRequest):
 @app.get("/api/feed")
 def get_feed():
     try:
-        # 最新の投稿順で取得
         res = supabase.table("posts").select("*").order("created_at", desc=True).limit(50).execute()
         return {"posts": res.data}
     except Exception as e:
@@ -250,7 +249,6 @@ def get_feed():
 @app.get("/api/trending")
 def get_trending():
     try:
-        # なんでやねんカウントが多い順に取得（ランキング）
         res = supabase.table("posts").select("*").order("nandeyanen_count", desc=True).limit(50).execute()
         return {"posts": res.data}
     except Exception as e:
@@ -259,7 +257,6 @@ def get_trending():
 @app.post("/api/nandeyanen/{post_id}")
 def add_nandeyanen(post_id: str):
     try:
-        # 現在のカウントを取得して+1する
         res = supabase.table("posts").select("nandeyanen_count").eq("id", post_id).execute()
         if res.data:
             current = res.data[0].get("nandeyanen_count") or 0
