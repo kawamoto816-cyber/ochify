@@ -1,6 +1,8 @@
 import streamlit as st
 import requests
 import time
+import uuid   # 🚨 追加：自力でUUIDを生成するための魔法の杖
+import random # 🚨 追加：自力で名前を生成するための魔法の杖
 
 st.set_page_config(page_title="Ochify | World Peace through Comedy", page_icon="🌎", layout="centered", initial_sidebar_state="collapsed")
 
@@ -70,8 +72,12 @@ def handle_api_error(res):
         st.error(t(f"データベース設定エラー: {error_detail}", f"DB Schema Error: {error_detail}"))
     else: st.error(f"API Error: {error_detail}")
 
-if st.session_state.user_id is None:
+# 🚨 ここが修正ポイント！ test_id の場合は強制リセットし、通信エラー時でも自力で有効なUUIDを生成する
+if st.session_state.user_id is None or st.session_state.user_id == "test_id":
     with st.spinner(t("🚀 起動中...", "🚀 Booting...")):
+        fallback_uuid = str(uuid.uuid4())
+        names = ["アホの坂田", "浪速の商人", "たこ焼き職人", "通天閣の虎", "くいだおれ太郎"]
+        fallback_name = random.choice(names) + str(random.randint(10, 99))
         try:
             res = requests.post(f"{API_URL}/api/init-user", timeout=10)
             if res.status_code == 200:
@@ -79,11 +85,11 @@ if st.session_state.user_id is None:
                 st.session_state.user_id = data.get("user_id")
                 st.session_state.username = data.get("username")
             else:
-                st.session_state.user_id = "test_id"
-                st.session_state.username = t("名無しユーザー", "Unknown User")
+                st.session_state.user_id = fallback_uuid
+                st.session_state.username = fallback_name
         except:
-            st.session_state.user_id = "test_id"
-            st.session_state.username = t("オフライン", "Offline User")
+            st.session_state.user_id = fallback_uuid
+            st.session_state.username = fallback_name
 
 # ==========================================
 # 🌟 新UI：ヘッダー（タイトルとメニューを画面内に配置）
