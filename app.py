@@ -6,20 +6,8 @@ st.set_page_config(page_title="Ochify | World Peace through Comedy", page_icon="
 
 st.markdown("""
 <style>
-    /* 📱 メニュー（≡ や ⋮）は絶対に死守し、右上に出る「Deploy」「GitHub」「Fork」だけを消す！ */
-    .stAppDeployButton {display: none !important;}
-    header[data-testid="stHeader"] a {display: none !important;}
-    [data-testid="stToolbar"] a {display: none !important;}
-    [data-testid="stToolbar"] button[title*="Fork"] {display: none !important;}
-    [data-testid="stToolbar"] button[title*="GitHub"] {display: none !important;}
-    [data-testid="stToolbar"] button[aria-label*="Fork"] {display: none !important;}
-    [data-testid="stToolbar"] button[aria-label*="GitHub"] {display: none !important;}
-
-    /* 👑 右下のStreamlitフッターや王冠バッジ（Manage app）を強制的に消す */
+    /* 👑 右下のStreamlitフッターを消す */
     footer {display: none !important;}
-    [data-testid="manage-app-button"] {display: none !important;}
-    div[class^="viewerBadge"] {display: none !important;}
-    [id^="viewerBadge"] {display: none !important;}
 
     .main {max-width: 500px; margin: 0 auto;}
     /* 🌙 ダークモード対応 */
