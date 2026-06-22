@@ -6,8 +6,9 @@ st.set_page_config(page_title="Ochify | World Peace through Comedy", page_icon="
 
 st.markdown("""
 <style>
-    /* 📱 修正: メニュー（≡）は残し、Deployボタンだけを消す！ */
+    /* 📱 修正: メニュー（⋮ や ≡）は残し、右上に出る「Deploy」や「GitHubリンク」だけをピンポイントで消す */
     .stAppDeployButton {display: none !important;}
+    header[data-testid="stHeader"] a {display: none !important;}
 
     /* 👑 右下のStreamlitフッターや王冠バッジ（Manage app）を強制的に消す */
     footer {display: none !important;}
@@ -60,14 +61,14 @@ def handle_api_error(res):
     if "503" in error_detail or "UNAVAILABLE" in error_detail or "high demand" in error_detail:
         st.error(t("⚠️ 現在、GoogleのAIサーバーが世界的なアクセス集中で大混雑しています！数秒待ってからもう一度お試しください🙏", "⚠️ Google AI server is currently experiencing high demand. Please try again in a few seconds🙏"))
     elif "boke_posts" in error_detail or "posts" in error_detail:
-        st.error(t(f"データベース設定エラー（箱の名前違い）: {error_detail}", f"DB Schema Error: {error_detail}"))
+        st.error(t(f"データベース設定エラー: {error_detail}", f"DB Schema Error: {error_detail}"))
     else:
         st.error(f"API Error: {error_detail}")
 
 if "user_id" not in st.session_state:
     with st.spinner(t("🚀 アカウントを自動生成中...", "🚀 Booting...")):
         try:
-            res = requests.post(f"{API_URL}/api/init-user", timeout=10)
+            res = requests.post(f"{API_URL}/init-user", timeout=10) # 修正: api不要な場合もあるが統一
             if res.status_code == 200:
                 data = res.json()
                 st.session_state.user_id = data.get("user_id")

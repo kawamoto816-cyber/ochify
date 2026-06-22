@@ -169,14 +169,16 @@ tsukkomi_1, tsukkomi_2, tsukkomi_3: (ツッコミ選択肢 emoji, jp, en)
     except Exception as e:
         handle_ai_error(e)
 
-# 🚨 ここから下、全部 boke_posts に直しました！
 @app.post("/api/publish")
 def publish(req: PublishRequest):
     try:
+        # 🚨 ここが修正ポイント！DBに専用の箱がなくても、データ(JSON)の中に名前を混ぜて保存する！
+        boke_data_to_save = req.boke_data.copy() if req.boke_data else {}
+        boke_data_to_save["author_name"] = req.author_name
+        
         record = {
             "author_id": req.author_id,
-            "author_name": req.author_name,
-            "boke_data": req.boke_data,
+            "boke_data": boke_data_to_save,
             "boke_vector": req.boke_vector,
             "nandeyanen_count": 0
         }
