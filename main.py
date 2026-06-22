@@ -103,7 +103,8 @@ tsukkomi_1, tsukkomi_2, tsukkomi_3: (それに対する3つのツッコミの選
             config=types.GenerateContentConfig(system_instruction=sys_prompt, response_mime_type="application/json", response_schema=get_json_schema(), temperature=0.8)
         )
         data = json.loads(response.text)
-        return {"boke_data": data, "boke_vector": [0.0]*10}
+        # 🚨 ここを 768 次元に修正！
+        return {"boke_data": data, "boke_vector": [0.0] * 768}
     except Exception as e:
         handle_ai_error(e)
 
@@ -130,7 +131,8 @@ tsukkomi_1, tsukkomi_2, tsukkomi_3: (ツッコミ選択肢 emoji, jp, en)
         supabase.storage.from_("ijiri_images").upload(file_name, img_bytes, {"content-type": file.content_type})
         public_url = supabase.storage.from_("ijiri_images").get_public_url(file_name)
         data["image_url"] = public_url
-        return {"boke_data": data, "boke_vector": [0.0]*10}
+        # 🚨 ここも 768 次元に修正！
+        return {"boke_data": data, "boke_vector": [0.0] * 768}
     except Exception as e:
         handle_ai_error(e)
 
@@ -165,14 +167,14 @@ tsukkomi_1, tsukkomi_2, tsukkomi_3: (ツッコミ選択肢 emoji, jp, en)
         )
         data = json.loads(response.text)
         data["goal"] = req.goal
-        return {"boke_data": data, "boke_vector": [0.0]*10}
+        # 🚨 ここも 768 次元に修正！
+        return {"boke_data": data, "boke_vector": [0.0] * 768}
     except Exception as e:
         handle_ai_error(e)
 
 @app.post("/api/publish")
 def publish(req: PublishRequest):
     try:
-        # 🚨 ここが修正ポイント！DBに専用の箱がなくても、データ(JSON)の中に名前を混ぜて保存する！
         boke_data_to_save = req.boke_data.copy() if req.boke_data else {}
         boke_data_to_save["author_name"] = req.author_name
         
