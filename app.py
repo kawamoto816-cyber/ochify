@@ -6,9 +6,8 @@ st.set_page_config(page_title="Ochify | World Peace through Comedy", page_icon="
 
 st.markdown("""
 <style>
-    /* 📱 スマホの左上メニュー（≡）は残し、右上のDeployボタンやツールバーを消す */
+    /* 📱 修正: メニュー（≡）は残し、Deployボタンだけを消す！ */
     .stAppDeployButton {display: none !important;}
-    [data-testid="stToolbar"] {display: none !important;}
 
     /* 👑 右下のStreamlitフッターや王冠バッジ（Manage app）を強制的に消す */
     footer {display: none !important;}
@@ -50,6 +49,20 @@ if selected_lang != st.session_state.lang:
 
 is_ja = (st.session_state.lang == "ja")
 def t(ja_text, en_text): return ja_text if is_ja else en_text
+
+# --- 🚨 AIエラーとDBエラーを優しく翻訳する関数 ---
+def handle_api_error(res):
+    try:
+        error_detail = res.json().get('detail', res.text)
+    except:
+        error_detail = res.text
+        
+    if "503" in error_detail or "UNAVAILABLE" in error_detail or "high demand" in error_detail:
+        st.error(t("⚠️ 現在、GoogleのAIサーバーが世界的なアクセス集中で大混雑しています！数秒待ってからもう一度お試しください🙏", "⚠️ Google AI server is currently experiencing high demand. Please try again in a few seconds🙏"))
+    elif "boke_posts" in error_detail or "posts" in error_detail:
+        st.error(t(f"データベース設定エラー（箱の名前違い）: {error_detail}", f"DB Schema Error: {error_detail}"))
+    else:
+        st.error(f"API Error: {error_detail}")
 
 if "user_id" not in st.session_state:
     with st.spinner(t("🚀 アカウントを自動生成中...", "🚀 Booting...")):
@@ -98,7 +111,7 @@ st.markdown(f'<div class="app-subtitle">{t("大阪のお笑いコミュニケー
 def render_post_card(post, is_trend=False, rank=0):
     boke = post.get("boke_data")
     if not isinstance(boke, dict):
-        boke = {} # 🛡️ エラーデータによるクラッシュを防止
+        boke = {}
         
     post_id = str(post.get("id"))
     is_mine = (post.get("author_id") == st.session_state.user_id)
@@ -171,7 +184,6 @@ if page_index == 0:
         boke_type = st.radio("Style", [t("💥 誇張（話を盛る）", "💥 Exaggeration"), t("😭 自虐（悲しいけど笑える）", "😭 Self-deprecating"), t("🤪 勘違い（すっとぼけ）", "🤪 Misunderstanding")], horizontal=True, label_visibility="collapsed")
         internal_boke_type = "誇張" if "💥" in boke_type else "自虐" if "😭" in boke_type else "勘違い"
         
-        # 🌟 Error表示バグの修正箇所（st.rerun()をtryの外に出した）
         if st.button(t("✨ ① オチファイする", "✨ 1. Ochify it!"), key="b1", use_container_width=True):
             if st.session_state.input_text:
                 success = False
@@ -183,7 +195,7 @@ if page_index == 0:
                             st.session_state.preview_data = data.get("boke_data")
                             st.session_state.preview_vector = data.get("boke_vector")
                             success = True
-                        else: st.error(f"API Error: {res.text}")
+                        else: handle_api_error(res)
                     except Exception as e: st.error(f"Network Error: {e}")
                 if success: st.rerun() 
             else: st.warning(t("出来事を入力してください！", "Please enter an event!"))
@@ -201,7 +213,7 @@ if page_index == 0:
                         st.session_state.preview_data = data.get("boke_data")
                         st.session_state.preview_vector = data.get("boke_vector")
                         success = True
-                    else: st.error(f"API Error: {res.text}")
+                    else: handle_api_error(res)
                 except Exception as e: st.error(f"Network Error: {e}")
             if success: st.rerun()
 
@@ -220,7 +232,7 @@ if page_index == 0:
                                 st.session_state.my_goal = goal_input
                                 st.session_state.my_deadline = deadline_input
                                 success = True
-                            else: st.error(f"API Error: {res.text}")
+                            else: handle_api_error(res)
                         except Exception as e: st.error(f"Network Error: {e}")
                     if success: st.session_state.yume_step = 2; st.rerun()
         elif st.session_state.yume_step == 2:
@@ -241,7 +253,7 @@ if page_index == 0:
                             st.session_state.preview_data = data.get("boke_data")
                             st.session_state.preview_vector = data.get("boke_vector")
                             success = True
-                        else: st.error(f"API Error: {res.text}")
+                        else: handle_api_error(res)
                     except Exception as e: st.error(f"Network Error: {e}")
                 if success: st.rerun()
 
@@ -274,7 +286,7 @@ if page_index == 0:
                         res = requests.post(f"{API_URL}/api/publish", json=payload, timeout=10)
                         if res.status_code == 200:
                             success = True
-                        else: st.error(f"DB保存エラー: Supabaseの「nandeyanen_count」設定を確認してください。詳細: {res.text}")
+                        else: handle_api_error(res)
                     except Exception as e: st.error(f"通信エラー: {e}")
                 if success:
                     st.session_state.preview_data = None
@@ -301,7 +313,7 @@ elif page_index == 1:
                     for post in posts:
                         try: render_post_card(post, is_trend=False)
                         except Exception as e: st.warning(f"一部の投稿をスキップしました (データ不具合): {e}")
-            else: st.error(f"フィード取得エラー: {feed_res.text}")
+            else: handle_api_error(feed_res)
         except Exception as e: st.error(f"通信エラー: {e}")
 
 elif page_index == 2:
@@ -319,7 +331,7 @@ elif page_index == 2:
                     for i, post in enumerate(ranked_posts[:10]):
                         try: render_post_card(post, is_trend=True, rank=i+1)
                         except Exception as e: pass
-            else: st.error(f"ランキング取得エラー: {trend_res.text}")
+            else: handle_api_error(trend_res)
         except Exception as e: st.error(f"通信エラー: {e}")
 
 elif page_index == 3:
