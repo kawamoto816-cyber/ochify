@@ -1,42 +1,30 @@
 import streamlit as st
 import requests
 import time
-import uuid   # 🚨 追加：自力でUUIDを生成するための魔法の杖
-import random # 🚨 追加：自力で名前を生成するための魔法の杖
+import uuid
+import random
 
 st.set_page_config(page_title="Ochify | World Peace through Comedy", page_icon="🌎", layout="centered", initial_sidebar_state="collapsed")
 
 st.markdown("""
 <style>
-    /* 💥 【究極魔法】Streamlitのヘッダーを丸ごと消し去る！これでForkもGitHubも完全に消滅します！ */
     header[data-testid="stHeader"] { display: none !important; }
-    
-    /* サイドバーも完全に隠す */
     [data-testid="stSidebar"] { display: none !important; }
-
-    /* 👑 右下のStreamlitフッターや不要な帯も完全に消去 */
     footer { display: none !important; }
     [data-testid="manage-app-button"] { display: none !important; }
     div[class^="viewerBadge"] { display: none !important; }
     [id^="viewerBadge"] { display: none !important; }
-
-    /* メインコンテナの上の余白を詰めてスマホアプリっぽくする */
     .block-container { padding-top: 1.5rem !important; padding-bottom: 1rem !important; }
-    
     .main {max-width: 500px; margin: 0 auto;}
-    /* 🌙 ダークモード対応 */
     .post-card {background-color: transparent; border-radius: 15px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(128,128,128,0.1); border: 1px solid rgba(128,128,128,0.3);}
     .my-post {border: 2px solid #4b8bff; background-color: rgba(75, 139, 255, 0.05);}
     .main-text {font-size: 1.2rem; font-weight: bold; margin-bottom: 10px;}
     .preview-box {border: 2px dashed #ff4b4b; border-radius: 10px; padding: 15px; margin-top: 20px; background-color: transparent;}
     .task-box {background-color: transparent; border-radius: 10px; padding: 15px; margin-top: 10px; border: 1px solid #b3d9ff; margin-bottom: 15px;}
-    
     .chat-bubble-me {background-color: #DCF8C6; color: #111 !important; padding: 10px 15px; border-radius: 20px; margin-bottom: 10px; text-align: right; width: fit-content; margin-left: auto; font-weight: bold;}
     .chat-bubble-other {background-color: #F1F0F0; color: #111 !important; padding: 10px 15px; border-radius: 20px; margin-bottom: 10px; width: fit-content; font-weight: bold;}
-    
     .goal-badge {background-color: #ff4b4b; color: white; padding: 5px 10px; border-radius: 15px; font-size: 0.8rem; font-weight: bold; display: inline-block; margin-bottom: 10px;}
     .stTabs [data-baseweb="tab-list"] button {font-weight: bold; font-size: 1.05rem;}
-    
     .app-title {font-size: 2.8rem; font-weight: 900; background: -webkit-linear-gradient(45deg, #ff4b4b, #ff904b); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0px; padding-bottom: 0px; letter-spacing: -1px;}
     .app-subtitle {font-size: 0.95rem; color: #888; font-style: italic; margin-top: -5px; margin-bottom: 20px;}
 </style>
@@ -45,7 +33,6 @@ st.markdown("""
 # 🚨 【超重要】ここのURLをご自身のRenderのURL（https://...onrender.com）にしてください
 API_URL = "https://ochify-api.onrender.com"
 
-# Session State
 if "lang" not in st.session_state: st.session_state.lang = "ja"
 if "user_id" not in st.session_state: st.session_state.user_id = None
 if "username" not in st.session_state: st.session_state.username = "Unknown"
@@ -63,16 +50,20 @@ if "ndy_counts" not in st.session_state: st.session_state.ndy_counts = {}
 is_ja = (st.session_state.lang == "ja")
 def t(ja_text, en_text): return ja_text if is_ja else en_text
 
+# 🚨 【修正】"503" の部分一致をやめ、真のエラーを隠さずに表示する！
 def handle_api_error(res):
     try: error_detail = res.json().get('detail', res.text)
     except: error_detail = res.text
-    if "503" in error_detail or "UNAVAILABLE" in error_detail or "high demand" in error_detail:
-        st.error(t("⚠️ 現在、GoogleのAIサーバーが大混雑しています！数秒待ってからもう一度お試しください🙏", "⚠️ Google AI server is currently experiencing high demand. Please try again in a few seconds🙏"))
+    
+    if "UNAVAILABLE" in error_detail or "high demand" in error_detail:
+        st.error(t("⚠️ 現在、GoogleのAIサーバーが大混雑しています！数秒待ってからもう一度お試しください🙏", "⚠️ Google AI server is high demand. Please try again🙏"))
+    elif "23503" in error_detail:
+        st.error(t(f"🚨 データベースの外部キー制約エラー(23503)です！Supabaseの『author_id』のリレーションを解除してください！\n詳細: {error_detail}", f"DB Foreign Key Error: {error_detail}"))
     elif "boke_posts" in error_detail or "posts" in error_detail:
         st.error(t(f"データベース設定エラー: {error_detail}", f"DB Schema Error: {error_detail}"))
-    else: st.error(f"API Error: {error_detail}")
+    else: 
+        st.error(f"API Error: {error_detail}")
 
-# 🚨 ここが修正ポイント！ test_id の場合は強制リセットし、通信エラー時でも自力で有効なUUIDを生成する
 if st.session_state.user_id is None or st.session_state.user_id == "test_id":
     with st.spinner(t("🚀 起動中...", "🚀 Booting...")):
         fallback_uuid = str(uuid.uuid4())
@@ -91,16 +82,11 @@ if st.session_state.user_id is None or st.session_state.user_id == "test_id":
             st.session_state.user_id = fallback_uuid
             st.session_state.username = fallback_name
 
-# ==========================================
-# 🌟 新UI：ヘッダー（タイトルとメニューを画面内に配置）
-# ==========================================
 st.markdown('<div class="app-title">Ochify</div>', unsafe_allow_html=True)
 st.markdown(f'<div class="app-subtitle">{t("大阪のお笑いコミュニケーションで、世界平和を。", "World Peace through Osaka Comedy.")}</div>', unsafe_allow_html=True)
 
-# ユーザー情報と設定タブ
 c1, c2 = st.columns([1.2, 1])
-with c1:
-    st.markdown(f"<div style='margin-top:10px; font-size:0.9rem; color:#888;'>👤 {st.session_state.username}</div>", unsafe_allow_html=True)
+with c1: st.markdown(f"<div style='margin-top:10px; font-size:0.9rem; color:#888;'>👤 {st.session_state.username}</div>", unsafe_allow_html=True)
 with c2:
     lang_choice = st.radio("Lang", ["🇯🇵 日本語", "🌍 English"], index=0 if is_ja else 1, horizontal=True, label_visibility="collapsed")
     new_lang = "ja" if "日本語" in lang_choice else "en"
@@ -110,7 +96,6 @@ with c2:
 
 st.markdown("---")
 
-# アプリ風タブメニュー
 pages = [t("✍️ 投稿", "✍️ Post"), t("🌍 フィード", "🌍 Feed"), t("👑 トレンド", "👑 Trend"), t("💬 DM", "💬 DM")]
 page_index = 0
 if "Feed" in st.session_state.current_page or "フィード" in st.session_state.current_page: page_index = 1
@@ -124,9 +109,6 @@ if selected_page != st.session_state.current_page:
 
 st.markdown("---")
 
-# ==========================================
-# 共通関数: 投稿カード
-# ==========================================
 def render_post_card(post, is_trend=False, rank=0):
     boke = post.get("boke_data")
     if not isinstance(boke, dict): boke = {}
@@ -185,9 +167,6 @@ def render_post_card(post, is_trend=False, rank=0):
                 if b3_txt and st.button(f"{t3.get('emoji','')} {b3_txt}", key=f"t3_{post_id}_{is_trend}", use_container_width=True): start_dm(b3_txt); st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ==========================================
-# ✍️ 投稿ルーム
-# ==========================================
 if page_index == 0:
     tab1, tab2, tab3 = st.tabs([t("📝 オチファイ", "📝 Ochify"), t("📸 いじられ映え", "📸 Roast-bae"), t("🚀 シランケド", "🚀 Shirankedo")])
     with tab1:
@@ -272,8 +251,12 @@ if page_index == 0:
         boke = st.session_state.preview_data
         st.markdown('<div class="preview-box">', unsafe_allow_html=True)
         st.markdown(t("#### 💡 プレビュー (未公開)", "#### 💡 Preview (Private)"))
-        if boke.get("type") == "yumeochi": st.markdown(f'<div class="goal-badge">🎯 {t("目標", "Goal")}: {boke.get("goal")}</div>', unsafe_allow_html=True)
-        if boke.get("type") == "image" and "image_url" in boke: st.image(boke["image_url"], use_container_width=True)
+        
+        if boke.get("type") == "yumeochi":
+            st.markdown(f'<div class="goal-badge">🎯 {t("目標", "Goal")}: {boke.get("goal")}</div>', unsafe_allow_html=True)
+        if boke.get("type") == "image" and "image_url" in boke: 
+            st.image(boke["image_url"], use_container_width=True)
+            
         display_text = boke.get('boke_jp', '') if is_ja else boke.get('boke_en', '')
         st.markdown(f'<div class="main-text">{"🇯🇵" if is_ja else "🌍"} {display_text}</div>', unsafe_allow_html=True)
         st.markdown("</div>", unsafe_allow_html=True)
@@ -284,20 +267,29 @@ if page_index == 0:
                 success = False
                 with st.spinner(t("DBに保存中...", "Saving...")):
                     try:
-                        payload = {"author_id": st.session_state.user_id, "author_name": st.session_state.username, "boke_data": st.session_state.preview_data, "boke_vector": st.session_state.preview_vector}
+                        payload = {
+                            "author_id": st.session_state.user_id,
+                            "author_name": st.session_state.username,
+                            "boke_data": st.session_state.preview_data, 
+                            "boke_vector": st.session_state.preview_vector
+                        }
                         res = requests.post(f"{API_URL}/api/publish", json=payload, timeout=10)
-                        if res.status_code == 200: success = True
+                        if res.status_code == 200:
+                            success = True
                         else: handle_api_error(res)
                     except Exception as e: st.error(f"通信エラー: {e}")
                 if success:
-                    st.session_state.preview_data = None; st.session_state.preview_vector = None
-                    st.toast(t("🎉 投稿完了！", "🎉 Published!"), icon="✅")
+                    st.session_state.preview_data = None
+                    st.session_state.preview_vector = None
+                    st.toast(t("🎉 投稿完了！閲覧者側フィードに移動します。", "🎉 Published! Moving to Feed."), icon="✅")
                     time.sleep(1.5)
                     st.session_state.current_page = pages[1]
                     st.rerun()
         with c2:
             if st.button(t("🗑 キャンセル", "🗑 Cancel"), use_container_width=True):
-                st.session_state.preview_data = None; st.session_state.preview_vector = None; st.rerun()
+                st.session_state.preview_data = None
+                st.session_state.preview_vector = None
+                st.rerun()
 
 elif page_index == 1:
     if st.button(t("🔄 フィードを更新", "🔄 Refresh Feed"), use_container_width=True): st.rerun()
@@ -310,11 +302,12 @@ elif page_index == 1:
                 else:
                     for post in posts:
                         try: render_post_card(post, is_trend=False)
-                        except: pass
+                        except Exception as e: st.warning(f"一部の投稿をスキップしました (データ不具合): {e}")
             else: handle_api_error(feed_res)
         except Exception as e: st.error(f"通信エラー: {e}")
 
 elif page_index == 2:
+    st.title(t("👑 トレンド", "👑 Trending"))
     st.write(t("世界中で一番「なんでやねん！」を集めている猛者たちです。", "The most 'Nandeyanen!' posts in the world."))
     if st.button(t("🔄 ランキングを更新", "🔄 Refresh Ranking"), use_container_width=True): st.rerun()
     with st.spinner(t("ランキングを集計中...", "Calculating trends...")):
@@ -323,15 +316,16 @@ elif page_index == 2:
             if trend_res.status_code == 200:
                 posts = trend_res.json().get("posts", [])
                 ranked_posts = [p for p in posts if (p.get("nandeyanen_count") or 0) > 0 or st.session_state.ndy_counts.get(str(p.get("id")), 0) > 0]
-                if not ranked_posts: st.info(t("まだ誰も「なんでやねん」されていません！", "No Nandeyanen yet."))
+                if not ranked_posts: st.info(t("まだ誰も「なんでやねん」されていません！フィードでツッコミを入れてみよう。", "No Nandeyanen yet. Go to Feed and react!"))
                 else:
                     for i, post in enumerate(ranked_posts[:10]):
                         try: render_post_card(post, is_trend=True, rank=i+1)
-                        except: pass
+                        except Exception as e: pass
             else: handle_api_error(trend_res)
         except Exception as e: st.error(f"通信エラー: {e}")
 
 elif page_index == 3:
+    st.title(t("💬 DMルーム", "💬 DM Room"))
     if not st.session_state.dm_history: st.info(t("まだ誰ともチャットしていません。", "No chats yet."))
     else:
         with st.container(border=True):
