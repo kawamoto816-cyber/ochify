@@ -2,7 +2,6 @@ import streamlit as st
 import requests
 import time
 
-# 🌍 アプリの正式名称を「Ochify」に変更！
 st.set_page_config(page_title="Ochify | World Peace through Comedy", page_icon="🌎", layout="centered")
 
 st.markdown("""
@@ -24,6 +23,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# 🔗 【超重要】本番用APIのURLをセット！
+API_URL = "https://ochify-api.onrender.com"
+
 if "lang" not in st.session_state: st.session_state.lang = "ja"
 st.sidebar.title("🌐 Language / 言語")
 lang_choice = st.sidebar.radio("Select Language", ["🇯🇵 日本語", "🌍 English"], index=0 if st.session_state.lang=="ja" else 1, label_visibility="collapsed")
@@ -41,7 +43,7 @@ def t(ja_text, en_text):
 if "user_id" not in st.session_state:
     with st.spinner(t("🚀 アカウントを自動生成中...", "🚀 Booting...")):
         try:
-            res = requests.post("http://127.0.0.1:8000/api/init-user", timeout=10)
+            res = requests.post(f"{API_URL}/api/init-user", timeout=10)
             if res.status_code == 200:
                 data = res.json()
                 st.session_state.user_id = data.get("user_id")
@@ -64,7 +66,6 @@ if "my_deadline" not in st.session_state: st.session_state.my_deadline = ""
 if "ai_tasks" not in st.session_state: st.session_state.ai_tasks = []
 
 st.sidebar.markdown("---")
-# 🌟 メニュー名もOchifyに
 st.sidebar.title(t("📱 Ochify メニュー", "📱 Ochify Menu"))
 st.sidebar.success(t(f"👤 あなたの正体:\n**{st.session_state.username}**", f"👤 Your Identity:\n**{st.session_state.username}**"))
 
@@ -78,7 +79,6 @@ if selected_page != st.session_state.current_page:
     st.session_state.current_page = selected_page
     st.rerun()
 
-# 🌟 画面上部にOchifyロゴと世界平和のビジョンを配置！
 st.markdown('<div class="app-title">Ochify</div>', unsafe_allow_html=True)
 st.markdown(f'<div class="app-subtitle">{t("大阪のお笑いコミュニケーションで、世界平和を。", "World Peace through Osaka Comedy.")}</div>', unsafe_allow_html=True)
 
@@ -87,7 +87,6 @@ st.markdown(f'<div class="app-subtitle">{t("大阪のお笑いコミュニケー
 # ==========================================
 if page_index == 0:
     
-    # 🌟 CEOのビジョンを反映した最終決定のタブ名！
     tab1, tab2, tab3 = st.tabs([t("📝 オチファイ", "📝 Ochify"), t("📸 いじられ映え", "📸 Roast-bae"), t("🚀 シランケド", "🚀 Shirankedo")])
     
     with tab1:
@@ -97,12 +96,11 @@ if page_index == 0:
         
         internal_boke_type = "誇張" if "💥" in boke_type else "自虐" if "😭" in boke_type else "勘違い"
         
-        # 🌟 ボタン名も「オチファイする」に変更
         if st.button(t("✨ ① オチファイする（何度でも変更OK！）", "✨ 1. Ochify it! (Redo anytime)"), key="b1", use_container_width=True):
             if st.session_state.input_text:
                 with st.spinner(t("AI放送作家が執筆中...", "AI is writing...")):
                     try:
-                        res = requests.post("http://127.0.0.1:8000/api/preview-boke", json={"text": st.session_state.input_text, "boke_type": internal_boke_type}, timeout=60).json()
+                        res = requests.post(f"{API_URL}/api/preview-boke", json={"text": st.session_state.input_text, "boke_type": internal_boke_type}, timeout=60).json()
                         st.session_state.preview_data = res.get("boke_data")
                         st.session_state.preview_vector = res.get("boke_vector")
                         st.rerun()
@@ -115,7 +113,7 @@ if page_index == 0:
             with st.spinner(t("AIおかんが画像をガン見中...", "AI is analyzing image...")):
                 try:
                     files = {"file": (uploaded_file.name, uploaded_file.getvalue(), uploaded_file.type)}
-                    res = requests.post("http://127.0.0.1:8000/api/preview-ijiri", files=files, timeout=60).json()
+                    res = requests.post(f"{API_URL}/api/preview-ijiri", files=files, timeout=60).json()
                     st.session_state.preview_data = res.get("boke_data")
                     st.session_state.preview_vector = res.get("boke_vector")
                     st.rerun()
@@ -131,7 +129,7 @@ if page_index == 0:
                 if goal_input and deadline_input:
                     with st.spinner(t("AIが最短ルートのタスクを考案中...", "AI is thinking...")):
                         try:
-                            res = requests.post("http://127.0.0.1:8000/api/generate-tasks", json={"goal": goal_input, "deadline": deadline_input}, timeout=60).json()
+                            res = requests.post(f"{API_URL}/api/generate-tasks", json={"goal": goal_input, "deadline": deadline_input}, timeout=60).json()
                             st.session_state.ai_tasks = res.get("tasks", [])
                             st.session_state.my_goal = goal_input
                             st.session_state.my_deadline = deadline_input
@@ -166,7 +164,7 @@ if page_index == 0:
                 if report_input:
                     with st.spinner(t("AIおかんが壮大な夢オチを執筆中...", "AI is generating...")):
                         try:
-                            res = requests.post("http://127.0.0.1:8000/api/preview-yumeochi", json={"goal": st.session_state.my_goal, "report": report_input}, timeout=60).json()
+                            res = requests.post(f"{API_URL}/api/preview-yumeochi", json={"goal": st.session_state.my_goal, "report": report_input}, timeout=60).json()
                             st.session_state.preview_data = res.get("boke_data")
                             st.session_state.preview_vector = res.get("boke_vector")
                             st.rerun()
@@ -207,7 +205,7 @@ if page_index == 0:
                         "boke_data": st.session_state.preview_data, 
                         "boke_vector": st.session_state.preview_vector
                     }
-                    requests.post("http://127.0.0.1:8000/api/publish", json=payload)
+                    requests.post(f"{API_URL}/api/publish", json=payload)
                 st.session_state.preview_data = None
                 st.session_state.preview_vector = None
                 st.toast(t("🎉 投稿完了！閲覧者側フィードに移動します。", "🎉 Published! Moving to Feed."), icon="✅")
@@ -229,7 +227,7 @@ elif page_index == 1:
         
     with st.spinner(t("最新の投稿を取得中...", "Loading latest posts...")):
         try:
-            feed_res = requests.get("http://127.0.0.1:8000/api/feed").json()
+            feed_res = requests.get(f"{API_URL}/api/feed").json()
             posts = feed_res.get("posts", [])
             if not posts: st.info(t("まだフィードに投稿がありません。", "No posts yet."))
             else:
@@ -245,7 +243,6 @@ elif page_index == 1:
                     if is_mine:
                         st.markdown(f"👤 **{author_name} ({t('あなた', 'You')})** <span style='color:green; font-weight:bold; font-size:0.8rem;'>・{t('自分の投稿', 'Your Post')}</span>", unsafe_allow_html=True)
                     else:
-                        # 🌟 ここも「Ochify」へブランド名を変更！
                         st.markdown(f"👤 **{author_name}** <span style='color:gray; font-size:0.8rem;'>・Ochify</span>", unsafe_allow_html=True)
                     st.markdown("<br>", unsafe_allow_html=True)
                     
