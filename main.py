@@ -47,7 +47,6 @@ class YumeochiRequest(BaseModel):
     goal: str
     report: str
 
-# 🚨 新規追加：DMチャット用のモデル
 class MessageRequest(BaseModel):
     sender_id: str
     receiver_id: str
@@ -55,11 +54,21 @@ class MessageRequest(BaseModel):
     receiver_name: str
     message_text: str
 
+# 🚨 【超絶進化】上方落語と商売人気質の「魂」を定義するコンテキスト
+OSAKA_ESSENCE = """
+【重要コンテキスト：大阪の笑いの本質とペルソナ】
+あなたは単なる関西弁を喋るAIではありません。上方落語に息づく「大阪の商売人気質」をベースにした人格を持っています。
+大阪の笑いの本質は「相手に絶対に損をさせない（徹底したサービス精神）」と、「限られた資源（日常の些細な出来事やネガティブな失敗）を最大化して、お互いに面白がる関係性の構築」にあります。
+上方落語（『貧乏花見』『阿弥陀池』『東の旅 発端』など）に見られるような、貧しさや不運の中にも知恵とユーモアを見出す精神性を根底に持ってください。
+語り口は、桂米朝師匠のような「知的で品のある俯瞰した目線」と、笑福亭鶴瓶師匠のような「人懐っこく相手の懐に入り込む愛と包容力」を併せ持つ、深みのあるトーンを意識してください。
+"""
+
 def get_boke_prompt(boke_type: str) -> str:
+    base = OSAKA_ESSENCE + "\n【タスク】\n"
     prompts = {
-        "誇張": "ユーザーの日常を、大阪のおばちゃん風に100倍くらい大げさに盛って面白くしてください。",
-        "自虐": "ユーザーの日常を、哀愁漂う自虐ネタにして笑いに変えてください。関西弁で。",
-        "勘違い": "ユーザーの日常を、盛大に勘違いしたボケにしてください。関西弁で。"
+        "誇張": base + "ユーザーの日常を、上方落語の『東の旅 発端』のような見事なホラ話（大げさな誇張）に昇華させ、笑福亭鶴瓶師匠のように人懐っこく相手を巻き込んで笑わせてください。",
+        "自虐": base + "ユーザーの悲しい出来事や失敗を、上方落語の『貧乏花見』のように明るく逞しく笑い飛ばし、相手を笑顔にする（損させない）桂米朝師匠のような知的な自虐ネタに変えてください。",
+        "勘違い": base + "ユーザーの日常を、上方落語の『阿弥陀池』のように理屈は通っているが盛大に勘違いしている愛すべきすっとぼけネタにし、テンポよく表現してください。"
     }
     return prompts.get(boke_type, prompts["誇張"])
 
@@ -99,16 +108,16 @@ def init_user():
 def preview_boke(req: BokeRequest):
     try:
         sys_prompt = get_boke_prompt(req.boke_type) + """
-出力は以下のJSON構造にしてください。
+\n出力は以下のJSON構造にしてください。
 type: "text"
 boke_jp: (ボケたテキスト 日本語)
 boke_en: (ボケたテキスト 英語)
-tsukkomi_1, tsukkomi_2, tsukkomi_3: (それに対する3つのツッコミの選択肢。emoji, jp, enを含む)
+tsukkomi_1, tsukkomi_2, tsukkomi_3: (それに対する3つのツッコミの選択肢。上方漫才のように愛のあるツッコミにしてください。emoji, jp, enを含む)
 """
         response = client.models.generate_content(
             model='gemini-2.5-flash',
             contents=req.text,
-            config=types.GenerateContentConfig(system_instruction=sys_prompt, response_mime_type="application/json", response_schema=get_json_schema(), temperature=0.8)
+            config=types.GenerateContentConfig(system_instruction=sys_prompt, response_mime_type="application/json", response_schema=get_json_schema(), temperature=0.85)
         )
         data = json.loads(response.text)
         return {"boke_data": data, "boke_vector": [0.0] * 768}
@@ -119,17 +128,19 @@ tsukkomi_1, tsukkomi_2, tsukkomi_3: (それに対する3つのツッコミの選
 async def preview_ijiri(file: UploadFile = File(...)):
     try:
         img_bytes = await file.read()
-        sys_prompt = """
-提供された画像を大阪のおばちゃん目線で容赦なくいじり倒してください。出力はJSONでお願いします。
+        # 🚨 画像いじりにも大阪の魂を注入
+        sys_prompt = OSAKA_ESSENCE + """
+\n【タスク】
+提供された画像を元に、笑福亭鶴瓶師匠のような人懐っこさと、商売人のような「相手をおいしくする（損させない）」愛のあるいじりを展開してください。決して相手を不快にさせず、画像の中の『資源を最大化して笑いに変える』こと。出力はJSON。
 type: "image"
-boke_jp: (いじりテキスト 日本語)
-boke_en: (いじりテキスト 英語)
+boke_jp: (愛のあるいじりテキスト 日本語)
+boke_en: (愛のあるいじりテキスト 英語)
 tsukkomi_1, tsukkomi_2, tsukkomi_3: (ツッコミ選択肢 emoji, jp, en)
 """
         response = client.models.generate_content(
             model='gemini-2.5-flash',
-            contents=[types.Part.from_bytes(data=img_bytes, mime_type=file.content_type), "この画像をいじってください。"],
-            config=types.GenerateContentConfig(system_instruction=sys_prompt, response_mime_type="application/json", response_schema=get_json_schema(), temperature=0.8)
+            contents=[types.Part.from_bytes(data=img_bytes, mime_type=file.content_type), "この画像を上方落語のユーモアを交えていじってください。"],
+            config=types.GenerateContentConfig(system_instruction=sys_prompt, response_mime_type="application/json", response_schema=get_json_schema(), temperature=0.85)
         )
         data = json.loads(response.text)
         import os, uuid
@@ -159,8 +170,10 @@ def generate_tasks(req: TaskRequest):
 @app.post("/api/preview-yumeochi")
 def preview_yumeochi(req: YumeochiRequest):
     try:
-        sys_prompt = """
-ユーザーの「目標」と「今日やったこと（サボったこと）」を比較し、「シランケド」で終わる夢オチの笑い話にしてください。出力はJSON。
+        # 🚨 シランケド機能にも落語のサゲ（オチ）の概念を注入
+        sys_prompt = OSAKA_ESSENCE + """
+\n【タスク】
+ユーザーの「目標」と「今日やったこと（サボったこと）」を比較し、上方落語の「サゲ（オチ）」のように見事に話をまとめ、最後は必ず「シランケド」で終わる笑い話にしてください。ダメな自分すらも商売人気質で「笑い」というプラスの資源に変換してください。桂米朝師匠のような知性ある語り口を取り入れてください。出力はJSON。
 type: "yumeochi"
 boke_jp: (シランケドで終わる日本語)
 boke_en: (英語。最後は Shirankedo.で締める)
@@ -169,7 +182,7 @@ tsukkomi_1, tsukkomi_2, tsukkomi_3: (ツッコミ選択肢 emoji, jp, en)
         response = client.models.generate_content(
             model='gemini-2.5-flash',
             contents=f"目標: {req.goal}\n今日のこと: {req.report}",
-            config=types.GenerateContentConfig(system_instruction=sys_prompt, response_mime_type="application/json", response_schema=get_json_schema(), temperature=0.8)
+            config=types.GenerateContentConfig(system_instruction=sys_prompt, response_mime_type="application/json", response_schema=get_json_schema(), temperature=0.85)
         )
         data = json.loads(response.text)
         data["goal"] = req.goal
@@ -223,7 +236,6 @@ def add_nandeyanen(post_id: str):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# 🚨 新規追加：本物のDM送受信API
 @app.post("/api/send-message")
 def send_message(req: MessageRequest):
     try:
@@ -242,7 +254,6 @@ def send_message(req: MessageRequest):
 @app.get("/api/messages/{user_id}")
 def get_messages(user_id: str):
     try:
-        # 自分に関係するメッセージをDBから全取得して古い順に並べる
         res = supabase.table("messages").select("*").or_(f"sender_id.eq.{user_id},receiver_id.eq.{user_id}").order("created_at", desc=False).execute()
         return {"messages": res.data}
     except Exception as e:
