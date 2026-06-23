@@ -33,22 +33,31 @@ st.markdown("""
 # 🚨 【超重要】ここのURLをご自身のRenderのURL（https://...onrender.com）にしてください
 API_URL = "https://ochify-api.onrender.com"
 
+# 🚨 新機能：URLパラメータから過去の記憶（ユーザーID）を呼び覚ます！
+if "user_id" not in st.session_state or st.session_state.user_id is None or st.session_state.user_id == "test_id":
+    qp = st.query_params
+    if "uid" in qp and "uname" in qp:
+        st.session_state.user_id = qp["uid"]
+        st.session_state.username = qp["uname"]
+    else:
+        # 初回アクセス時は新しくIDと名前を作り、URLに焼き付ける
+        st.session_state.user_id = str(uuid.uuid4())
+        names = ["アホの坂田", "浪速の商人", "たこ焼き職人", "通天閣の虎", "くいだおれ太郎", "道頓堀の星", "串カツ大将"]
+        st.session_state.username = random.choice(names) + str(random.randint(10, 99))
+        try:
+            st.query_params["uid"] = st.session_state.user_id
+            st.query_params["uname"] = st.session_state.username
+        except: pass
+
 if "lang" not in st.session_state: st.session_state.lang = "ja"
-if "user_id" not in st.session_state: st.session_state.user_id = None
-if "username" not in st.session_state: st.session_state.username = "Unknown"
 if "current_page" not in st.session_state: st.session_state.current_page = "✍️ 投稿"
 if "preview_data" not in st.session_state: st.session_state.preview_data = None
 if "preview_vector" not in st.session_state: st.session_state.preview_vector = None
-
-# 🚨 偽物の履歴(dm_history)を廃止し、本物のチャット相手を保存する箱を作る
 if "chat_target" not in st.session_state: st.session_state.chat_target = None 
-
-if "input_text" not in st.session_state: st.session_state.input_text = "" 
-if "yume_step" not in st.session_state: st.session_state.yume_step = 1
+if "ndy_counts" not in st.session_state: st.session_state.ndy_counts = {}
 if "my_goal" not in st.session_state: st.session_state.my_goal = ""
 if "my_deadline" not in st.session_state: st.session_state.my_deadline = ""
 if "ai_tasks" not in st.session_state: st.session_state.ai_tasks = []
-if "ndy_counts" not in st.session_state: st.session_state.ndy_counts = {}
 
 is_ja = (st.session_state.lang == "ja")
 def t(ja_text, en_text): return ja_text if is_ja else en_text
@@ -56,7 +65,6 @@ def t(ja_text, en_text): return ja_text if is_ja else en_text
 def handle_api_error(res):
     try: error_detail = res.json().get('detail', res.text)
     except: error_detail = res.text
-    
     if "UNAVAILABLE" in error_detail or "high demand" in error_detail:
         st.error(t("⚠️ 現在、GoogleのAIサーバーが大混雑しています！数秒待ってからもう一度お試しください🙏", "⚠️ Google AI server is high demand. Please try again🙏"))
     elif "23503" in error_detail:
@@ -66,35 +74,21 @@ def handle_api_error(res):
     else: 
         st.error(f"API Error: {error_detail}")
 
-if st.session_state.user_id is None or st.session_state.user_id == "test_id":
-    with st.spinner(t("🚀 起動中...", "🚀 Booting...")):
-        fallback_uuid = str(uuid.uuid4())
-        names = ["アホの坂田", "浪速の商人", "たこ焼き職人", "通天閣の虎", "くいだおれ太郎"]
-        fallback_name = random.choice(names) + str(random.randint(10, 99))
-        try:
-            res = requests.post(f"{API_URL}/api/init-user", timeout=10)
-            if res.status_code == 200:
-                data = res.json()
-                st.session_state.user_id = data.get("user_id")
-                st.session_state.username = data.get("username")
-            else:
-                st.session_state.user_id = fallback_uuid
-                st.session_state.username = fallback_name
-        except:
-            st.session_state.user_id = fallback_uuid
-            st.session_state.username = fallback_name
-
 st.markdown('<div class="app-title">Ochify</div>', unsafe_allow_html=True)
 st.markdown(f'<div class="app-subtitle">{t("大阪のお笑いコミュニケーションで、世界平和を。", "World Peace through Osaka Comedy.")}</div>', unsafe_allow_html=True)
 
 c1, c2 = st.columns([1.2, 1])
-with c1: st.markdown(f"<div style='margin-top:10px; font-size:0.9rem; color:#888;'>👤 {st.session_state.username}</div>", unsafe_allow_html=True)
+with c1: 
+    st.markdown(f"<div style='margin-top:10px; font-size:0.9rem; color:#888;'>👤 {st.session_state.username}</div>", unsafe_allow_html=True)
 with c2:
     lang_choice = st.radio("Lang", ["🇯🇵 日本語", "🌍 English"], index=0 if is_ja else 1, horizontal=True, label_visibility="collapsed")
     new_lang = "ja" if "日本語" in lang_choice else "en"
     if new_lang != st.session_state.lang:
         st.session_state.lang = new_lang
         st.rerun()
+
+# 友人に教えるURL（IDが含まれないクリーンなURL）を明記
+st.markdown(f"<p style='font-size:0.8rem; color:#888; text-align:center;'>🔗 {t('友人に教える時はこのURL', 'Share this URL')}: <b>https://ochify-world.streamlit.app</b></p>", unsafe_allow_html=True)
 
 st.markdown("---")
 
@@ -158,21 +152,13 @@ def render_post_card(post, is_trend=False, rank=0):
         with c2:
             with st.expander(t("💬 DMで直接ツッコむ", "💬 Reply in DM")):
                 t1, t2, t3 = boke.get('tsukkomi_1',{}), boke.get('tsukkomi_2',{}), boke.get('tsukkomi_3',{})
-                
-                # 🚨 【修正】本物のDBに最初のツッコミを送信して、DM画面へ飛ぶ
                 def start_dm(tsukkomi_text):
-                    if target_id == st.session_state.user_id:
+                    if author_id == st.session_state.user_id:
                         st.toast(t("自分にはツッコめません！", "Cannot react to yourself!"))
                         return
                     if tsukkomi_text:
                         st.session_state.chat_target = {"id": author_id, "name": author_name}
-                        payload = {
-                            "sender_id": st.session_state.user_id,
-                            "receiver_id": author_id,
-                            "sender_name": st.session_state.username,
-                            "receiver_name": author_name,
-                            "message_text": f"【ツッコミ】{tsukkomi_text}"
-                        }
+                        payload = {"sender_id": st.session_state.user_id, "receiver_id": author_id, "sender_name": st.session_state.username, "receiver_name": author_name, "message_text": f"【ツッコミ】{tsukkomi_text}"}
                         try: requests.post(f"{API_URL}/api/send-message", json=payload, timeout=5)
                         except: pass
                         st.session_state.current_page = pages[3]
@@ -342,44 +328,53 @@ elif page_index == 2:
             else: handle_api_error(trend_res)
         except Exception as e: st.error(f"通信エラー: {e}")
 
-# ==========================================
-# 🚨 【修正】本物のDMルーム！
-# ==========================================
 elif page_index == 3:
     st.markdown(t("### 💬 DMルーム", "### 💬 DM Room"))
     
-    # 1. APIから自分のメッセージ履歴を取得
+    # 🚨 【新機能】タブを閉じた時のための「アカウント復元」機能
+    with st.expander(t("🔑 アカウント設定 / 復元 (Account Restore)", "🔑 Account Settings / Restore")):
+        st.write(t("タブを閉じて別人に生まれ変わってしまった時のために、以下の『復元コード』をどこかにメモ（コピペ）しておいてください。", "Save this restore code to recover your account if you close the tab."))
+        st.code(f"{st.session_state.user_id}:::{st.session_state.username}", language="text")
+        
+        st.markdown("---")
+        restore_input = st.text_input(t("復元コードを入力して元に戻る", "Enter restore code to recover"))
+        if st.button(t("アカウントを復元する", "Restore Account")):
+            if ":::" in restore_input:
+                parts = restore_input.split(":::")
+                if len(parts) == 2:
+                    st.session_state.user_id = parts[0].strip()
+                    st.session_state.username = parts[1].strip()
+                    try:
+                        st.query_params["uid"] = st.session_state.user_id
+                        st.query_params["uname"] = st.session_state.username
+                    except: pass
+                    st.success(t("✅ 過去の自分を取り戻しました！", "✅ Restored!"))
+                    time.sleep(1.5)
+                    st.rerun()
+    
     messages = []
     try:
         res = requests.get(f"{API_URL}/api/messages/{st.session_state.user_id}", timeout=10)
-        if res.status_code == 200:
-            messages = res.json().get("messages", [])
+        if res.status_code == 200: messages = res.json().get("messages", [])
     except: pass
         
-    # 2. 履歴から「チャットしたことのある相手」のリストを作る
     contacts = {}
     for m in messages:
-        if m["sender_id"] != st.session_state.user_id:
-            contacts[m["sender_id"]] = m["sender_name"]
-        if m["receiver_id"] != st.session_state.user_id:
-            contacts[m["receiver_id"]] = m["receiver_name"]
+        if m["sender_id"] != st.session_state.user_id: contacts[m["sender_id"]] = m["sender_name"]
+        if m["receiver_id"] != st.session_state.user_id: contacts[m["receiver_id"]] = m["receiver_name"]
             
-    # 3. フィードのツッコミから飛んできた場合、履歴がなくても相手をリストに追加
     if st.session_state.chat_target:
         tgt_id = st.session_state.chat_target["id"]
-        if tgt_id not in contacts:
-            contacts[tgt_id] = st.session_state.chat_target["name"]
+        if tgt_id not in contacts: contacts[tgt_id] = st.session_state.chat_target["name"]
 
     if not contacts:
         st.info(t("まだ誰ともチャットしていません。フィードで誰かの投稿にツッコミを入れてみましょう！", "No chats yet. React to a feed post!"))
     else:
-        # 相手を選ぶプルダウンを作成
         contact_options = [f"{v} (ID: {k[:4]})" for k, v in contacts.items()]
         default_index = 0
         if st.session_state.chat_target:
             tgt_str = f"{st.session_state.chat_target['name']} (ID: {st.session_state.chat_target['id'][:4]})"
-            if tgt_str in contact_options:
-                default_index = contact_options.index(tgt_str)
+            if tgt_str in contact_options: default_index = contact_options.index(tgt_str)
                 
         selected_contact_str = st.selectbox(t("📩 トーク相手を選択", "Select contact"), contact_options, index=default_index)
         
@@ -391,42 +386,25 @@ elif page_index == 3:
                 
         if target_id:
             st.session_state.chat_target = {"id": target_id, "name": contacts[target_id]}
-            
             c1, c2 = st.columns([3, 1])
             with c2:
-                # 💡 手動の「更新ボタン」を用意
                 if st.button(t("🔄 更新", "Refresh"), use_container_width=True): st.rerun()
             
             with st.container(border=True):
                 st.markdown(f"👤 **{contacts[target_id]}**")
                 st.markdown("---")
-                
-                # 選んだ相手とのやりとりだけを抽出
                 chat_msgs = [m for m in messages if (m["sender_id"] == target_id and m["receiver_id"] == st.session_state.user_id) or (m["sender_id"] == st.session_state.user_id and m["receiver_id"] == target_id)]
-                
-                if not chat_msgs:
-                    st.write(t("まだメッセージはありません。", "No messages here."))
+                if not chat_msgs: st.write(t("まだメッセージはありません。", "No messages here."))
                 else:
                     for m in chat_msgs:
-                        if m["sender_id"] == st.session_state.user_id:
-                            st.markdown(f"<div class='chat-bubble-me'>{m['message_text']}</div>", unsafe_allow_html=True)
-                        else:
-                            st.markdown(f"<div class='chat-bubble-other'>{m['message_text']}</div>", unsafe_allow_html=True)
-                        
+                        if m["sender_id"] == st.session_state.user_id: st.markdown(f"<div class='chat-bubble-me'>{m['message_text']}</div>", unsafe_allow_html=True)
+                        else: st.markdown(f"<div class='chat-bubble-other'>{m['message_text']}</div>", unsafe_allow_html=True)
                 st.markdown("---")
-                
-                # 💬 メッセージ送信フォーム（送信後に自動で文字が消える）
                 with st.form("dm_form", clear_on_submit=True):
                     dm_input = st.text_input(t("メッセージを送信...", "Send message..."))
                     submit_btn = st.form_submit_button(t("送信", "Send"), type="primary", use_container_width=True)
                     if submit_btn and dm_input:
-                        payload = {
-                            "sender_id": st.session_state.user_id,
-                            "receiver_id": target_id,
-                            "sender_name": st.session_state.username,
-                            "receiver_name": contacts[target_id],
-                            "message_text": dm_input
-                        }
+                        payload = {"sender_id": st.session_state.user_id, "receiver_id": target_id, "sender_name": st.session_state.username, "receiver_name": contacts[target_id], "message_text": dm_input}
                         try: requests.post(f"{API_URL}/api/send-message", json=payload, timeout=5)
                         except: pass
                         st.rerun()
