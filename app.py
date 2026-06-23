@@ -3,6 +3,7 @@ import requests
 import time
 import uuid
 import random
+import urllib.parse # 🚨 追加：SNSシェア用のURLを作る魔法
 
 st.set_page_config(page_title="Ochify | World Peace through Comedy", page_icon="🌎", layout="centered", initial_sidebar_state="collapsed")
 
@@ -33,14 +34,12 @@ st.markdown("""
 # 🚨 【超重要】ここのURLをご自身のRenderのURL（https://...onrender.com）にしてください
 API_URL = "https://ochify-api.onrender.com"
 
-# 🚨 新機能：URLパラメータから過去の記憶（ユーザーID）を呼び覚ます！
 if "user_id" not in st.session_state or st.session_state.user_id is None or st.session_state.user_id == "test_id":
     qp = st.query_params
     if "uid" in qp and "uname" in qp:
         st.session_state.user_id = qp["uid"]
         st.session_state.username = qp["uname"]
     else:
-        # 初回アクセス時は新しくIDと名前を作り、URLに焼き付ける
         st.session_state.user_id = str(uuid.uuid4())
         names = ["アホの坂田", "浪速の商人", "たこ焼き職人", "通天閣の虎", "くいだおれ太郎", "道頓堀の星", "串カツ大将"]
         st.session_state.username = random.choice(names) + str(random.randint(10, 99))
@@ -87,8 +86,41 @@ with c2:
         st.session_state.lang = new_lang
         st.rerun()
 
-# 友人に教えるURL（IDが含まれないクリーンなURL）を明記
-st.markdown(f"<p style='font-size:0.8rem; color:#888; text-align:center;'>🔗 {t('友人に教える時はこのURL', 'Share this URL')}: <b>https://ochify-world.streamlit.app</b></p>", unsafe_allow_html=True)
+# ==========================================
+# 📣 新機能：5大SNSシェアボタン（WhatsApp・Instagram搭載）
+# ==========================================
+with st.expander(t("🔗 友達を招待する (Share with friends!)", "🔗 Share with friends!")):
+    share_url = "https://ochify-world.streamlit.app"
+    share_text = t("Ochifyで大阪のお笑いコミュニケーションを体験しよう！😂", "Experience Osaka comedy communication on Ochify!😂")
+    
+    encoded_text = urllib.parse.quote(share_text)
+    encoded_url = urllib.parse.quote(share_url)
+    
+    # 各種SNSのAPI仕様に合わせたリンク
+    line_url = f"https://line.me/R/msg/text/?{encoded_text}%20{encoded_url}"
+    x_url = f"https://twitter.com/intent/tweet?text={encoded_text}&url={encoded_url}"
+    fb_url = f"https://www.facebook.com/sharer/sharer.php?u={encoded_url}"
+    wa_url = f"https://api.whatsapp.com/send?text={encoded_text}%20{encoded_url}"
+    ig_url = "https://www.instagram.com/" # インスタは直接シェアAPIがないためアプリ起動のみ
+    
+    st.write(t("👇 各種SNSへシェア！(Click to share)", "👇 Click to share!"))
+    
+    # スマホ画面で綺麗に収まるように3列×2段で配置
+    col1, col2, col3 = st.columns(3)
+    with col1: st.link_button("💬 LINE", line_url, use_container_width=True)
+    with col2: st.link_button("𝕏 (X)", x_url, use_container_width=True)
+    with col3: st.link_button("📘 FB", fb_url, use_container_width=True)
+    
+    col4, col5, col6 = st.columns(3)
+    with col4: st.link_button("🟩 WhatsApp", wa_url, use_container_width=True)
+    with col5: st.link_button("📸 Insta", ig_url, use_container_width=True)
+    with col6: st.empty() # レイアウトのバランス調整
+    
+    # Instagram用のフォローアップ案内
+    st.markdown(t("<p style='font-size:0.75rem; color:#ff4b4b; margin-top:5px; font-weight:bold; line-height:1.2;'>※Instagramは仕様上、文字が自動入力されません。下の枠からURLをコピーしてストーリーズ等に貼り付けてください🙏</p>", "<p style='font-size:0.75rem; color:#ff4b4b; margin-top:5px; font-weight:bold; line-height:1.2;'>*Instagram doesn't support auto-text. Please copy the URL below and paste it🙏</p>"), unsafe_allow_html=True)
+    
+    st.markdown(f"<p style='font-size:0.8rem; color:#888; margin-top:10px; margin-bottom:0;'>👇 {t('直接URLをコピー（右端のアイコンで一発コピー！）', 'Copy URL (Click icon on the right)')}</p>", unsafe_allow_html=True)
+    st.code(share_url, language="text")
 
 st.markdown("---")
 
@@ -331,7 +363,6 @@ elif page_index == 2:
 elif page_index == 3:
     st.markdown(t("### 💬 DMルーム", "### 💬 DM Room"))
     
-    # 🚨 【新機能】タブを閉じた時のための「アカウント復元」機能
     with st.expander(t("🔑 アカウント設定 / 復元 (Account Restore)", "🔑 Account Settings / Restore")):
         st.write(t("タブを閉じて別人に生まれ変わってしまった時のために、以下の『復元コード』をどこかにメモ（コピペ）しておいてください。", "Save this restore code to recover your account if you close the tab."))
         st.code(f"{st.session_state.user_id}:::{st.session_state.username}", language="text")
@@ -386,25 +417,52 @@ elif page_index == 3:
                 
         if target_id:
             st.session_state.chat_target = {"id": target_id, "name": contacts[target_id]}
-            c1, c2 = st.columns([3, 1])
-            with c2:
-                if st.button(t("🔄 更新", "Refresh"), use_container_width=True): st.rerun()
+            st.markdown(f"#### 👤 **{contacts[target_id]}**")
             
-            with st.container(border=True):
-                st.markdown(f"👤 **{contacts[target_id]}**")
-                st.markdown("---")
+            # 🚨 【魔法】手動更新ボタンを廃止し、チャット履歴だけを5秒ごとに自動更新（Polling）する！
+            if hasattr(st, "fragment"):
+                @st.fragment(run_every=5)
+                def auto_refresh_chat():
+                    try:
+                        r = requests.get(f"{API_URL}/api/messages/{st.session_state.user_id}", timeout=5)
+                        if r.status_code == 200: 
+                            all_msgs = r.json().get("messages", [])
+                        else: all_msgs = []
+                    except: all_msgs = []
+                    
+                    chat_msgs = [m for m in all_msgs if (m["sender_id"] == target_id and m["receiver_id"] == st.session_state.user_id) or (m["sender_id"] == st.session_state.user_id and m["receiver_id"] == target_id)]
+                    
+                    with st.container(border=True, height=350):
+                        if not chat_msgs:
+                            st.write(t("まだメッセージはありません。", "No messages here."))
+                        else:
+                            for m in chat_msgs:
+                                if m["sender_id"] == st.session_state.user_id:
+                                    st.markdown(f"<div class='chat-bubble-me'>{m['message_text']}</div>", unsafe_allow_html=True)
+                                else:
+                                    st.markdown(f"<div class='chat-bubble-other'>{m['message_text']}</div>", unsafe_allow_html=True)
+                
+                auto_refresh_chat()
+            else:
                 chat_msgs = [m for m in messages if (m["sender_id"] == target_id and m["receiver_id"] == st.session_state.user_id) or (m["sender_id"] == st.session_state.user_id and m["receiver_id"] == target_id)]
-                if not chat_msgs: st.write(t("まだメッセージはありません。", "No messages here."))
-                else:
-                    for m in chat_msgs:
-                        if m["sender_id"] == st.session_state.user_id: st.markdown(f"<div class='chat-bubble-me'>{m['message_text']}</div>", unsafe_allow_html=True)
-                        else: st.markdown(f"<div class='chat-bubble-other'>{m['message_text']}</div>", unsafe_allow_html=True)
-                st.markdown("---")
-                with st.form("dm_form", clear_on_submit=True):
-                    dm_input = st.text_input(t("メッセージを送信...", "Send message..."))
-                    submit_btn = st.form_submit_button(t("送信", "Send"), type="primary", use_container_width=True)
-                    if submit_btn and dm_input:
-                        payload = {"sender_id": st.session_state.user_id, "receiver_id": target_id, "sender_name": st.session_state.username, "receiver_name": contacts[target_id], "message_text": dm_input}
-                        try: requests.post(f"{API_URL}/api/send-message", json=payload, timeout=5)
-                        except: pass
-                        st.rerun()
+                with st.container(border=True, height=350):
+                    if not chat_msgs:
+                        st.write(t("まだメッセージはありません。", "No messages here."))
+                    else:
+                        for m in chat_msgs:
+                            if m["sender_id"] == st.session_state.user_id:
+                                st.markdown(f"<div class='chat-bubble-me'>{m['message_text']}</div>", unsafe_allow_html=True)
+                            else:
+                                st.markdown(f"<div class='chat-bubble-other'>{m['message_text']}</div>", unsafe_allow_html=True)
+                if st.button("🔄 手動更新 (Refresh)"): st.rerun()
+
+            st.markdown("---")
+            
+            with st.form("dm_form", clear_on_submit=True):
+                dm_input = st.text_input(t("メッセージを送信...", "Send message..."))
+                submit_btn = st.form_submit_button(t("送信", "Send"), type="primary", use_container_width=True)
+                if submit_btn and dm_input:
+                    payload = {"sender_id": st.session_state.user_id, "receiver_id": target_id, "sender_name": st.session_state.username, "receiver_name": contacts[target_id], "message_text": dm_input}
+                    try: requests.post(f"{API_URL}/api/send-message", json=payload, timeout=5)
+                    except: pass
+                    st.rerun()
