@@ -3,7 +3,7 @@ import requests
 import time
 import uuid
 import random
-import urllib.parse # 🚨 追加：SNSシェア用のURLを作る魔法
+import urllib.parse 
 
 st.set_page_config(page_title="Ochify | World Peace through Comedy", page_icon="🌎", layout="centered", initial_sidebar_state="collapsed")
 
@@ -12,9 +12,15 @@ st.markdown("""
     header[data-testid="stHeader"] { display: none !important; }
     [data-testid="stSidebar"] { display: none !important; }
     footer { display: none !important; }
+    
+    /* 👑 画面右下の「王冠マーク」や「顔アイコン」などの宣伝バッジを徹底的に排除！ */
     [data-testid="manage-app-button"] { display: none !important; }
-    div[class^="viewerBadge"] { display: none !important; }
-    [id^="viewerBadge"] { display: none !important; }
+    [data-testid="stAppDeployButton"] { display: none !important; }
+    [data-testid="stStatusWidget"] { display: none !important; }
+    .stAppDeployButton { display: none !important; }
+    div[class*="viewerBadge"] { display: none !important; }
+    [id*="viewerBadge"] { display: none !important; }
+    
     .block-container { padding-top: 1.5rem !important; padding-bottom: 1rem !important; }
     .main {max-width: 500px; margin: 0 auto;}
     .post-card {background-color: transparent; border-radius: 15px; padding: 20px; margin-bottom: 20px; box-shadow: 0 4px 6px rgba(128,128,128,0.1); border: 1px solid rgba(128,128,128,0.3);}
@@ -31,7 +37,7 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 🚨 【超重要】ここのURLをご自身のRenderのURL（https://...onrender.com）にしてください
+# 🚨 【超重要】ここのURLをご自身のRenderのURLにしてください
 API_URL = "https://ochify-api.onrender.com"
 
 if "user_id" not in st.session_state or st.session_state.user_id is None or st.session_state.user_id == "test_id":
@@ -48,6 +54,12 @@ if "user_id" not in st.session_state or st.session_state.user_id is None or st.s
             st.query_params["uname"] = st.session_state.username
         except: pass
 
+# 🚨 ここでURLに強制的に「embed=true」を付与して王冠の表示を無効化します！
+try:
+    st.query_params["embed"] = "true"
+except: pass
+
+# 🚨 ここが前回削ってしまった「エラーの原因」です！すべての初期設定を復活・補完しました！
 if "lang" not in st.session_state: st.session_state.lang = "ja"
 if "current_page" not in st.session_state: st.session_state.current_page = "✍️ 投稿"
 if "preview_data" not in st.session_state: st.session_state.preview_data = None
@@ -57,6 +69,8 @@ if "ndy_counts" not in st.session_state: st.session_state.ndy_counts = {}
 if "my_goal" not in st.session_state: st.session_state.my_goal = ""
 if "my_deadline" not in st.session_state: st.session_state.my_deadline = ""
 if "ai_tasks" not in st.session_state: st.session_state.ai_tasks = []
+if "input_text" not in st.session_state: st.session_state.input_text = ""
+if "yume_step" not in st.session_state: st.session_state.yume_step = 1
 
 is_ja = (st.session_state.lang == "ja")
 def t(ja_text, en_text): return ja_text if is_ja else en_text
@@ -67,7 +81,7 @@ def handle_api_error(res):
     if "UNAVAILABLE" in error_detail or "high demand" in error_detail:
         st.error(t("⚠️ 現在、GoogleのAIサーバーが大混雑しています！数秒待ってからもう一度お試しください🙏", "⚠️ Google AI server is high demand. Please try again🙏"))
     elif "23503" in error_detail:
-        st.error(t(f"🚨 データベースの外部キー制約エラー(23503)です！Supabaseの『author_id』のリレーションを解除してください！\n詳細: {error_detail}", f"DB Foreign Key Error: {error_detail}"))
+        st.error(t(f"🚨 データベースの外部キー制約エラーです！\n詳細: {error_detail}", f"DB Error: {error_detail}"))
     elif "boke_posts" in error_detail or "posts" in error_detail:
         st.error(t(f"データベース設定エラー: {error_detail}", f"DB Schema Error: {error_detail}"))
     else: 
@@ -86,26 +100,22 @@ with c2:
         st.session_state.lang = new_lang
         st.rerun()
 
-# ==========================================
-# 📣 新機能：5大SNSシェアボタン（WhatsApp・Instagram搭載）
-# ==========================================
 with st.expander(t("🔗 友達を招待する (Share with friends!)", "🔗 Share with friends!")):
-    share_url = "https://ochify-world.streamlit.app"
+    # 🚨 ここが超重要！ シェアするURLに "?embed=true" を組み込みました！
+    share_url = "https://ochify-world.streamlit.app/?embed=true"
     share_text = t("Ochifyで大阪のお笑いコミュニケーションを体験しよう！😂", "Experience Osaka comedy communication on Ochify!😂")
     
     encoded_text = urllib.parse.quote(share_text)
     encoded_url = urllib.parse.quote(share_url)
     
-    # 各種SNSのAPI仕様に合わせたリンク
     line_url = f"https://line.me/R/msg/text/?{encoded_text}%20{encoded_url}"
     x_url = f"https://twitter.com/intent/tweet?text={encoded_text}&url={encoded_url}"
     fb_url = f"https://www.facebook.com/sharer/sharer.php?u={encoded_url}"
     wa_url = f"https://api.whatsapp.com/send?text={encoded_text}%20{encoded_url}"
-    ig_url = "https://www.instagram.com/" # インスタは直接シェアAPIがないためアプリ起動のみ
+    ig_url = "https://www.instagram.com/" 
     
     st.write(t("👇 各種SNSへシェア！(Click to share)", "👇 Click to share!"))
     
-    # スマホ画面で綺麗に収まるように3列×2段で配置
     col1, col2, col3 = st.columns(3)
     with col1: st.link_button("💬 LINE", line_url, use_container_width=True)
     with col2: st.link_button("𝕏 (X)", x_url, use_container_width=True)
@@ -114,9 +124,8 @@ with st.expander(t("🔗 友達を招待する (Share with friends!)", "🔗 Sha
     col4, col5, col6 = st.columns(3)
     with col4: st.link_button("🟩 WhatsApp", wa_url, use_container_width=True)
     with col5: st.link_button("📸 Insta", ig_url, use_container_width=True)
-    with col6: st.empty() # レイアウトのバランス調整
+    with col6: st.empty() 
     
-    # Instagram用のフォローアップ案内
     st.markdown(t("<p style='font-size:0.75rem; color:#ff4b4b; margin-top:5px; font-weight:bold; line-height:1.2;'>※Instagramは仕様上、文字が自動入力されません。下の枠からURLをコピーしてストーリーズ等に貼り付けてください🙏</p>", "<p style='font-size:0.75rem; color:#ff4b4b; margin-top:5px; font-weight:bold; line-height:1.2;'>*Instagram doesn't support auto-text. Please copy the URL below and paste it🙏</p>"), unsafe_allow_html=True)
     
     st.markdown(f"<p style='font-size:0.8rem; color:#888; margin-top:10px; margin-bottom:0;'>👇 {t('直接URLをコピー（右端のアイコンで一発コピー！）', 'Copy URL (Click icon on the right)')}</p>", unsafe_allow_html=True)
@@ -378,6 +387,7 @@ elif page_index == 3:
                     try:
                         st.query_params["uid"] = st.session_state.user_id
                         st.query_params["uname"] = st.session_state.username
+                        st.query_params["embed"] = "true"
                     except: pass
                     st.success(t("✅ 過去の自分を取り戻しました！", "✅ Restored!"))
                     time.sleep(1.5)
@@ -419,7 +429,6 @@ elif page_index == 3:
             st.session_state.chat_target = {"id": target_id, "name": contacts[target_id]}
             st.markdown(f"#### 👤 **{contacts[target_id]}**")
             
-            # 🚨 【魔法】手動更新ボタンを廃止し、チャット履歴だけを5秒ごとに自動更新（Polling）する！
             if hasattr(st, "fragment"):
                 @st.fragment(run_every=5)
                 def auto_refresh_chat():
