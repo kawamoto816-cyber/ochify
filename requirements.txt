@@ -6,4 +6,4 @@ google-genai
 python-dotenv
 pydantic
 python-multipart
-requests
+requestsstreamlit-cookies-manager

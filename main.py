@@ -32,7 +32,7 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 class BokeRequest(BaseModel):
     text: str
     boke_type: str
-    is_original: bool = False # 🚨 新機能: そのまま放流するかどうか
+    is_original: bool = False
 
 class PublishRequest(BaseModel):
     author_id: str
@@ -55,12 +55,10 @@ class MessageRequest(BaseModel):
     receiver_name: str
     message_text: str
 
-# 🚨 新機能: ユーザー名変更APIを追加
 class UpdateUserRequest(BaseModel):
     user_id: str
     new_name: str
 
-# 🚨 【進化】上方落語の魂 ＋ 「文字数の自動調整」プロンプト
 OSAKA_ESSENCE = """
 【重要コンテキスト：大阪の笑いの本質とペルソナ】
 あなたは単なる関西弁を喋るAIではありません。上方落語に息づく「大阪の商売人気質」をベースにした人格を持っています。
@@ -68,10 +66,10 @@ OSAKA_ESSENCE = """
 桂米朝師匠のような「知的で品のある俯瞰した目線」と、笑福亭鶴瓶師匠のような「人懐っこく相手の懐に入り込む愛と包容力」を意識してください。
 """
 
+# 🚨 【修正】AIの長文暴走を止める絶対命令（Hard Limit）とFew-Shot（具体例）！
 def get_boke_prompt(boke_type: str, text_len: int, is_original: bool) -> str:
     base = OSAKA_ESSENCE + "\n"
     
-    # 🚨 新機能: ユーザーが自分でオチをつけた（オリジナル）場合
     if is_original:
         base += """
 【タスク】
@@ -81,21 +79,24 @@ def get_boke_prompt(boke_type: str, text_len: int, is_original: bool) -> str:
 """
         return base
 
-    # 🚨 新機能：入力文字数に比例させた出力のルール
-    length_hint = ""
+    length_hint = f"\n【🚨絶対遵守ルール（CRITICAL）🚨】\nユーザーの入力は「{text_len}文字」です。\n"
     if text_len <= 15:
-        length_hint = "【重要】ユーザーの入力が短いため、出力も『短く鋭い一言のボケ（1〜2文）』にしてください！ダラダラ語らないこと！"
-    elif text_len >= 50:
-        length_hint = "【重要】ユーザーの入力が長いため、出力も『情景が浮かぶ上方落語のようなしっかりとした長文のボケ』にしてください。"
+        length_hint += """
+👉 入力が非常に短いため、出力の『boke_jp』も必ず【1文のみ、最大40文字以内】の短く鋭い一言ボケにしてください！
+（良い例：「パン食べたいやと！？ワイの頭のコッペパンでもかじっとけ！」）
+絶対に長文でダラダラ語らないこと！長文はシステムエラーを引き起こすため固く禁じます！
+"""
+    elif text_len <= 30:
+        length_hint += "👉 出力の『boke_jp』は【絶対に60文字程度（2〜3文以内）のテンポの良いボケ】にしてください。"
     else:
-        length_hint = "【重要】ユーザーの入力と同じくらいの長さ感（テンポ）でボケてください。"
+        length_hint += "👉 ユーザーの入力が長いため、出力の『boke_jp』は【情景が浮かぶ上方落語のようなしっかりとした長文のボケ】にしてください。"
 
     base += length_hint + "\n【タスク】\n"
     
     prompts = {
         "誇張": base + "ユーザーの日常を、上方落語の『東の旅 発端』のような見事なホラ話（大げさな誇張）に昇華させ、笑福亭鶴瓶師匠のように人懐っこく相手を巻き込んで笑わせてください。",
         "自虐": base + "ユーザーの悲しい出来事や失敗を、上方落語の『貧乏花見』のように明るく逞しく笑い飛ばし、相手を笑顔にする桂米朝師匠のような知的な自虐ネタに変えてください。",
-        "勘違い": base + "ユーザーの日常を、上方落語の『阿弥陀池』のように理屈は通っているが盛大に勘違いしている愛すべきすっとぼけネタにし、テンポよく表現してください。"
+        "勘違い": base + "ユーザーの日常を、上方落語の『阿弥陀池』のように理屈は通っているが盛大に勘違いしている愛すべきすっとぼけネタにしてください。"
     }
     return prompts.get(boke_type, prompts["誇張"])
 
@@ -137,14 +138,13 @@ def init_user():
     except: pass
     return {"user_id": user_id, "username": username}
 
-# 🚨 【新機能】名前変更用API
 @app.post("/api/update-user")
 def update_user(req: UpdateUserRequest):
     try:
         supabase.table("users").update({"username": req.new_name}).eq("id", req.user_id).execute()
         return {"status": "success"}
     except Exception as e:
-        return {"status": "success"}
+        return {"status": "error"}
 
 @app.post("/api/preview-boke")
 def preview_boke(req: BokeRequest):
@@ -154,20 +154,19 @@ def preview_boke(req: BokeRequest):
 type: "text"
 boke_jp: (ボケたテキスト 日本語)
 boke_en: (ボケたテキスト 英語)
-tsukkomi_1, tsukkomi_2, tsukkomi_3: (それに対する3つのツッコミの選択肢。emoji, jp, en)
+tsukkomi_1, tsukkomi_2, tsukkomi_3: (ツッコミの選択肢 emoji, jp, en)
 """
         response = client.models.generate_content(
             model='gemini-2.5-flash',
             contents=req.text,
-            config=types.GenerateContentConfig(system_instruction=sys_prompt, response_mime_type="application/json", response_schema=get_json_schema(), temperature=0.85)
+            config=types.GenerateContentConfig(system_instruction=sys_prompt, response_mime_type="application/json", response_schema=get_json_schema(), temperature=0.7) # 🚨 温度を下げてルールを厳格に守らせる
         )
         data = json.loads(clean_json(response.text))
         data["type"] = "text"
         
-        # オリジナルの場合は、ユーザーの入力文字をそのままboke_jpにセットする安全装置
         if req.is_original:
             data["boke_jp"] = req.text
-            data["is_original"] = True # フラグをデータ内にも保存
+            data["is_original"] = True 
 
         try:
             emb_res = client.models.embed_content(model='text-embedding-004', contents=data.get("boke_en", "test"))
@@ -183,9 +182,7 @@ tsukkomi_1, tsukkomi_2, tsukkomi_3: (それに対する3つのツッコミの選
 async def preview_ijiri(file: UploadFile = File(...)):
     try:
         img_bytes = await file.read()
-        sys_prompt = OSAKA_ESSENCE + """
-\n【タスク】提供された画像を元に、笑福亭鶴瓶師匠のような人懐っこさと、商売人のような「相手をおいしくする（損させない）」愛のあるいじりを展開してください。出力はJSON。
-"""
+        sys_prompt = OSAKA_ESSENCE + "\n【タスク】提供された画像を元に、笑福亭鶴瓶師匠のような人懐っこさと、商売人のような「相手をおいしくする（損させない）」愛のあるいじりを展開してください。出力はJSON。"
         response = client.models.generate_content(
             model='gemini-2.5-flash',
             contents=[types.Part.from_bytes(data=img_bytes, mime_type=file.content_type), "この画像を上方落語のユーモアを交えていじってください。"],
@@ -193,13 +190,11 @@ async def preview_ijiri(file: UploadFile = File(...)):
         )
         data = json.loads(clean_json(response.text))
         data["type"] = "image"
-        
         import os, uuid
         file_ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
         file_name = f"{uuid.uuid4()}.{file_ext}"
         supabase.storage.from_("ijiri_images").upload(file_name, img_bytes, {"content-type": file.content_type})
         data["image_url"] = supabase.storage.from_("ijiri_images").get_public_url(file_name)
-        
         try:
             emb_res = client.models.embed_content(model='text-embedding-004', contents=data.get("boke_en", "test"))
             boke_vector = emb_res.embeddings[0].values
@@ -220,14 +215,11 @@ def generate_tasks(req: TaskRequest):
 @app.post("/api/preview-yumeochi")
 def preview_yumeochi(req: YumeochiRequest):
     try:
-        sys_prompt = OSAKA_ESSENCE + """
-\n【タスク】ユーザーの「目標」と「今日やったこと（サボったこと）」を比較し、上方落語の「サゲ（オチ）」のように見事に話をまとめ、最後は必ず「シランケド」で終わる笑い話にしてください。出力はJSON。
-"""
+        sys_prompt = OSAKA_ESSENCE + "\n【タスク】ユーザーの「目標」と「今日やったこと（サボったこと）」を比較し、上方落語の「サゲ（オチ）」のように見事に話をまとめ、最後は必ず「シランケド」で終わる笑い話にしてください。出力はJSON。"
         response = client.models.generate_content(model='gemini-2.5-flash', contents=f"目標: {req.goal}\n今日のこと: {req.report}", config=types.GenerateContentConfig(system_instruction=sys_prompt, response_mime_type="application/json", response_schema=get_json_schema(), temperature=0.85))
         data = json.loads(clean_json(response.text))
         data["type"] = "yumeochi"
         data["goal"] = req.goal
-        
         try:
             emb_res = client.models.embed_content(model='text-embedding-004', contents=data.get("boke_en", "test"))
             boke_vector = emb_res.embeddings[0].values
@@ -255,7 +247,6 @@ def get_feed():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# 🚨 新規追加：マイページ用（自分の投稿だけ全取得する）
 @app.get("/api/my-posts/{user_id}")
 def get_my_posts(user_id: str):
     try:

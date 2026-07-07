@@ -4,9 +4,14 @@ import time
 import uuid
 import random
 import urllib.parse
+from streamlit_cookies_manager import EncryptedCookieManager
 
-# 🚨 アプリの起動時の状態を定義
 st.set_page_config(page_title="Ochify | World Peace through Comedy", page_icon="🌎", layout="centered", initial_sidebar_state="collapsed")
+
+# 🚨 【新機能】ブラウザのCookie（クッキー）を使って記憶を永続化する魔法
+cookies = EncryptedCookieManager(prefix="ochify", password="super_secret_password_for_ochify_2026")
+if not cookies.ready():
+    st.stop() # Cookieの準備ができるまで一瞬待つ
 
 st.markdown("""
 <style>
@@ -28,14 +33,9 @@ st.markdown("""
     .stTabs [data-baseweb="tab-list"] button {font-weight: bold; font-size: 1.05rem;}
     .app-title {font-size: 2.8rem; font-weight: 900; background: -webkit-linear-gradient(45deg, #ff4b4b, #ff904b); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 0px; padding-bottom: 0px; letter-spacing: -1px;}
     .app-subtitle {font-size: 0.95rem; color: #888; font-style: italic; margin-top: -5px; margin-bottom: 15px;}
-    
     .tutorial-box {background-color: #fff9e6; border-left: 5px solid #ffcc00; padding: 15px; margin-bottom: 20px; border-radius: 5px; color: #333;}
-    
-    /* 🚨 改善2: オチファイボタンを目立たせるCSS */
     .btn-ochify button { background: linear-gradient(45deg, #ff4b4b, #ff904b) !important; color: white !important; font-weight: 900 !important; font-size: 1.1rem !important; border: none !important; box-shadow: 0 4px 6px rgba(255, 75, 75, 0.4) !important;}
     .btn-ochify button:hover { opacity: 0.9; transform: scale(1.02); }
-    
-    /* タブの横スクロール対応 */
     div[data-testid="stRadio"] > div { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 5px; }
     div[data-testid="stRadio"] > div::-webkit-scrollbar { height: 4px; }
     div[data-testid="stRadio"] > div::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 4px; }
@@ -45,29 +45,36 @@ st.markdown("""
 # 🚨 ご自身のRender URL
 API_URL = "https://ochify-api.onrender.com"
 
-# --- 状態管理（初期化） ---
+# --- 🚨 修正: Cookieを使った最強の記憶永続化 ---
 if "user_id" not in st.session_state or st.session_state.user_id is None or st.session_state.user_id == "test_id":
-    qp = st.query_params
-    if "uid" in qp and "uname" in qp:
-        st.session_state.user_id = qp["uid"]
-        st.session_state.username = qp["uname"]
+    # 1. まずはCookie（ブラウザの記憶）を探す
+    if cookies.get("user_id"):
+        st.session_state.user_id = cookies.get("user_id")
+        st.session_state.username = cookies.get("username")
     else:
-        st.session_state.user_id = str(uuid.uuid4())
-        names = ["アホの坂田", "浪速の商人", "たこ焼き職人", "通天閣の虎", "くいだおれ太郎", "道頓堀の星", "串カツ大将"]
-        st.session_state.username = random.choice(names) + str(random.randint(10, 99))
-        try:
-            st.query_params["uid"] = st.session_state.user_id
-            st.query_params["uname"] = st.session_state.username
-            st.query_params["embed"] = "true"
-        except: pass
+        # 2. なければ新規作成
+        with st.spinner("🚀 Booting..."):
+            try:
+                res = requests.post(f"{API_URL}/api/init-user", timeout=10)
+                if res.status_code == 200:
+                    data = res.json()
+                    st.session_state.user_id = data.get("user_id")
+                    st.session_state.username = data.get("username")
+                else:
+                    st.session_state.user_id = str(uuid.uuid4())
+                    st.session_state.username = "名無しユーザー" + str(random.randint(10, 99))
+            except:
+                st.session_state.user_id = str(uuid.uuid4())
+                st.session_state.username = "オフライン" + str(random.randint(10, 99))
+            
+            # 作った記憶をCookieに保存して焼き付ける！
+            cookies["user_id"] = st.session_state.user_id
+            cookies["username"] = st.session_state.username
+            cookies.save()
 
 if "lang" not in st.session_state: st.session_state.lang = "ja"
-
-# 🚨 改善1: アプリ起動時のデフォルトタブを「フィード」に変更！
 if "current_page" not in st.session_state: st.session_state.current_page = "🌍 フィード" 
-# 🚨 改善8: チュートリアル表示フラグ
 if "tutorial_shown" not in st.session_state: st.session_state.tutorial_shown = False
-
 if "preview_data" not in st.session_state: st.session_state.preview_data = None
 if "preview_vector" not in st.session_state: st.session_state.preview_vector = None
 if "chat_target" not in st.session_state: st.session_state.chat_target = None 
@@ -93,7 +100,6 @@ def handle_api_error(res):
 st.markdown('<div class="app-title">Ochify</div>', unsafe_allow_html=True)
 st.markdown(f'<div class="app-subtitle">{t("大阪のお笑いコミュニケーションで、世界平和を。", "World Peace through Osaka Comedy.")}</div>', unsafe_allow_html=True)
 
-# 🚨 改善8: 初回限定チュートリアル
 if not st.session_state.tutorial_shown:
     st.markdown(f"""
     <div class="tutorial-box">
@@ -145,7 +151,6 @@ with st.expander(t("🔗 友達を招待・URLシェア", "🔗 Share with frien
 
 st.markdown("---")
 
-# 🚨 改善3: 「マイページ（👤 自分）」タブを新設！
 pages = [t("🌍 フィード", "🌍 Feed"), t("✍️ 投稿", "✍️ Post"), t("👑 トレンド", "👑 Trend"), t("💬 DM", "💬 DM"), t("👤 マイページ", "👤 Profile")]
 page_index = 0
 if "Feed" in st.session_state.current_page or "フィード" in st.session_state.current_page: page_index = 0
@@ -161,13 +166,12 @@ if selected_page != st.session_state.current_page:
 
 st.markdown("---")
 
-# === 共通コンポーネント: 投稿カード ===
 def render_post_card(post, is_trend=False, rank=0, hide_actions=False):
     boke = post.get("boke_data")
     if not isinstance(boke, dict): boke = {}
     post_id = str(post.get("id"))
     author_id = str(post.get("author_id"))
-    is_original = boke.get("is_original", False) # 🚨 オリジナルフラグを取得
+    is_original = boke.get("is_original", False)
     is_mine = (author_id == st.session_state.user_id)
     author_name = post.get("author_name") or boke.get("author_name") or t("見知らぬユーザー", "Unknown User")
     
@@ -185,7 +189,6 @@ def render_post_card(post, is_trend=False, rank=0, hide_actions=False):
     if is_mine: st.markdown(f"👤 **{author_name} ({t('あなた', 'You')})** <span style='color:#4b8bff; font-weight:bold; font-size:0.8rem;'>・{t('自分の投稿', 'Your Post')}</span>", unsafe_allow_html=True)
     else: st.markdown(f"👤 **{author_name}** <span style='color:gray; font-size:0.8rem;'>・Ochify</span>", unsafe_allow_html=True)
     
-    # 🚨 オリジナル投稿の場合はバッジをつける
     if is_original:
         st.markdown(f'<div class="original-badge">✍️ {t("オリジナル投稿", "Original Post")}</div>', unsafe_allow_html=True)
         
@@ -223,7 +226,7 @@ def render_post_card(post, is_trend=False, rank=0, hide_actions=False):
                             payload = {"sender_id": st.session_state.user_id, "receiver_id": author_id, "sender_name": st.session_state.username, "receiver_name": author_name, "message_text": f"【ツッコミ】{tsukkomi_text}"}
                             try: requests.post(f"{API_URL}/api/send-message", json=payload, timeout=5)
                             except: pass
-                            st.session_state.current_page = pages[3] # DMタブへ移動
+                            st.session_state.current_page = pages[3] 
                             
                     b1_txt = t1.get('jp','') if is_ja else t1.get('en','')
                     b2_txt = t2.get('jp','') if is_ja else t2.get('en','')
@@ -233,9 +236,6 @@ def render_post_card(post, is_trend=False, rank=0, hide_actions=False):
                     if b3_txt and st.button(f"{t3.get('emoji','')} {b3_txt}", key=f"t3_{post_id}_{is_trend}", use_container_width=True): start_dm(b3_txt); st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-# ==========================================
-# 🌍 フィード (Index 0)
-# ==========================================
 if page_index == 0:
     if st.button(t("🔄 フィードを更新", "🔄 Refresh Feed"), use_container_width=True): st.rerun()
     with st.spinner(t("最新の投稿を取得中...", "Loading latest posts...")):
@@ -251,15 +251,11 @@ if page_index == 0:
             else: handle_api_error(feed_res)
         except Exception as e: st.error(f"通信エラー: {e}")
 
-# ==========================================
-# ✍️ 投稿ルーム (Index 1)
-# ==========================================
 elif page_index == 1:
     tab1, tab2, tab3 = st.tabs([t("📝 オチファイ", "📝 Ochify"), t("📸 いじられ映え", "📸 Roast-bae"), t("🚀 シランケド", "🚀 Shirankedo")])
     with tab1:
         st.text_area(t("日常の出来事や、自分の最高のボケを書いてや！", "Write an event or your original joke!"), key="input_text", height=100)
         
-        # 🚨 改善6: AIかオリジナルかを選択
         st.markdown(t("<p style='font-size:0.9rem; font-weight:bold; color:#888; margin-top:10px;'>💡 投稿のスタイルは？</p>", "<p style='font-size:0.9rem; font-weight:bold; color:#888; margin-top:10px;'>💡 Post Style</p>"), unsafe_allow_html=True)
         post_style = st.radio("Style", [
             t("🤖 AIにお任せ（誇張）", "🤖 AI: Exaggeration"), 
@@ -272,7 +268,6 @@ elif page_index == 1:
         internal_boke_type = "オリジナル" if is_original else "誇張" if "💥" in post_style else "自虐" if "😭" in post_style else "勘違い"
         btn_text = t("✨ ① オチファイする", "✨ 1. Ochify it!") if not is_original else t("🚀 ① そのまま送信（翻訳とボタンだけ作る）", "🚀 1. Keep original (Generate buttons)")
         
-        # 🚨 改善2: オチファイボタンを「btn-ochify」クラスでCSS装飾！
         st.markdown('<div class="btn-ochify">', unsafe_allow_html=True)
         if st.button(btn_text, key="b1", type="primary", use_container_width=True):
             if st.session_state.input_text:
@@ -348,8 +343,9 @@ elif page_index == 1:
                     try:
                         res = requests.post(f"{API_URL}/api/preview-yumeochi", json={"goal": st.session_state.my_goal, "report": report_input}, timeout=60)
                         if res.status_code == 200:
-                            st.session_state.preview_data = res.json().get("boke_data")
-                            st.session_state.preview_vector = res.json().get("boke_vector")
+                            data = res.json()
+                            st.session_state.preview_data = data.get("boke_data")
+                            st.session_state.preview_vector = data.get("boke_vector")
                             success = True
                         else: handle_api_error(res)
                     except Exception as e: st.error(f"Network Error: {e}")
@@ -377,7 +373,12 @@ elif page_index == 1:
                 success = False
                 with st.spinner(t("DBに保存中...", "Saving...")):
                     try:
-                        payload = {"author_id": st.session_state.user_id, "author_name": st.session_state.username, "boke_data": st.session_state.preview_data, "boke_vector": st.session_state.preview_vector}
+                        payload = {
+                            "author_id": st.session_state.user_id,
+                            "author_name": st.session_state.username,
+                            "boke_data": st.session_state.preview_data, 
+                            "boke_vector": st.session_state.preview_vector
+                        }
                         res = requests.post(f"{API_URL}/api/publish", json=payload, timeout=10)
                         if res.status_code == 200: success = True
                         else: handle_api_error(res)
@@ -385,9 +386,10 @@ elif page_index == 1:
                 if success:
                     st.session_state.preview_data = None
                     st.session_state.preview_vector = None
+                    st.session_state.input_text = ""
                     st.toast(t("🎉 投稿完了！", "🎉 Published!"), icon="✅")
                     time.sleep(1.5)
-                    st.session_state.current_page = pages[0] # フィードへ戻る
+                    st.session_state.current_page = pages[0] 
                     st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
         with c2:
@@ -396,9 +398,6 @@ elif page_index == 1:
                 st.session_state.preview_vector = None
                 st.rerun()
 
-# ==========================================
-# 👑 トレンド (Index 2)
-# ==========================================
 elif page_index == 2:
     st.markdown(t("### 👑 トレンド", "### 👑 Trending"))
     st.write(t("世界中で一番「なんでやねん！」を集めている猛者たちです。", "The most 'Nandeyanen!' posts in the world."))
@@ -409,17 +408,14 @@ elif page_index == 2:
             if trend_res.status_code == 200:
                 posts = trend_res.json().get("posts", [])
                 ranked_posts = [p for p in posts if (p.get("nandeyanen_count") or 0) > 0 or st.session_state.ndy_counts.get(str(p.get("id")), 0) > 0]
-                if not ranked_posts: st.info(t("まだ誰も「なんでやねん」されていません！", "No Nandeyanen yet."))
+                if not ranked_posts: st.info(t("まだ誰も「なんでやねん」されていません！フィードでツッコミを入れてみよう。", "No Nandeyanen yet. Go to Feed and react!"))
                 else:
                     for i, post in enumerate(ranked_posts[:10]):
                         try: render_post_card(post, is_trend=True, rank=i+1)
                         except: pass
             else: handle_api_error(trend_res)
-        except Exception as e: st.error("Error")
+        except Exception as e: st.error(f"通信エラー: {e}")
 
-# ==========================================
-# 💬 DMルーム (Index 3)
-# ==========================================
 elif page_index == 3:
     st.markdown(t("### 💬 DMルーム", "### 💬 DM Room"))
     messages = []
@@ -493,13 +489,13 @@ elif page_index == 3:
                     st.rerun()
 
 # ==========================================
-# 👤 改善3: マイページ（アカウント設定と過去の投稿一覧）
+# 👤 マイページ
 # ==========================================
 elif page_index == 4:
     st.markdown(t("### 👤 マイページ", "### 👤 My Profile"))
     
-    # 🌟 名前変更機能
-    with st.expander(t("⚙️ アカウント設定（名前変更・復元）", "⚙️ Account Settings"), expanded=True):
+    # 🚨 【新機能】名前変更時にCookieとURLの両方を更新！
+    with st.expander(t("⚙️ アカウント設定（名前変更）", "⚙️ Account Settings"), expanded=True):
         new_name = st.text_input(t("ニックネームを変更", "Change Nickname"), value=st.session_state.username)
         if st.button(t("名前を変更する", "Update Name"), type="primary"):
             if new_name and len(new_name.strip()) > 0:
@@ -508,8 +504,13 @@ elif page_index == 4:
                         res = requests.post(f"{API_URL}/api/update-user", json={"user_id": st.session_state.user_id, "new_name": new_name.strip()}, timeout=10)
                         if res.status_code == 200:
                             st.session_state.username = new_name.strip()
+                            # URLも更新
                             try: st.query_params["uname"] = st.session_state.username
                             except: pass
+                            # 🍪 Cookieも更新
+                            cookies["username"] = st.session_state.username
+                            cookies.save()
+                            
                             st.success(t("✅ ニックネームを変更しました！", "✅ Nickname updated!"))
                             time.sleep(1)
                             st.rerun()
@@ -531,6 +532,11 @@ elif page_index == 4:
                         st.query_params["uname"] = st.session_state.username
                         st.query_params["embed"] = "true"
                     except: pass
+                    # 🍪 復元した記憶もCookieに焼き付ける
+                    cookies["user_id"] = st.session_state.user_id
+                    cookies["username"] = st.session_state.username
+                    cookies.save()
+                    
                     st.success(t("✅ 過去の自分を取り戻しました！", "✅ Restored!"))
                     time.sleep(1.5)
                     st.rerun()
@@ -541,7 +547,6 @@ elif page_index == 4:
     if st.button(t("🔄 履歴を更新", "🔄 Refresh History"), use_container_width=True): st.rerun()
     with st.spinner(t("読み込み中...", "Loading...")):
         try:
-            # 🚨 自分（user_id）の投稿だけを抽出する！
             feed_res = requests.get(f"{API_URL}/api/my-posts/{st.session_state.user_id}")
             if feed_res.status_code == 200:
                 posts = feed_res.json().get("posts", [])
