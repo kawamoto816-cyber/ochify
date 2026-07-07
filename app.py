@@ -8,10 +8,10 @@ from streamlit_cookies_manager import EncryptedCookieManager
 
 st.set_page_config(page_title="Ochify | World Peace through Comedy", page_icon="🌎", layout="centered", initial_sidebar_state="collapsed")
 
-# 🚨 【新機能】ブラウザのCookie（クッキー）を使って記憶を永続化する魔法
+# 🚨 ブラウザのCookieを使って記憶を永続化
 cookies = EncryptedCookieManager(prefix="ochify", password="super_secret_password_for_ochify_2026")
 if not cookies.ready():
-    st.stop() # Cookieの準備ができるまで一瞬待つ
+    st.stop()
 
 st.markdown("""
 <style>
@@ -45,14 +45,11 @@ st.markdown("""
 # 🚨 ご自身のRender URL
 API_URL = "https://ochify-api.onrender.com"
 
-# --- 🚨 修正: Cookieを使った最強の記憶永続化 ---
 if "user_id" not in st.session_state or st.session_state.user_id is None or st.session_state.user_id == "test_id":
-    # 1. まずはCookie（ブラウザの記憶）を探す
     if cookies.get("user_id"):
         st.session_state.user_id = cookies.get("user_id")
         st.session_state.username = cookies.get("username")
     else:
-        # 2. なければ新規作成
         with st.spinner("🚀 Booting..."):
             try:
                 res = requests.post(f"{API_URL}/api/init-user", timeout=10)
@@ -67,7 +64,6 @@ if "user_id" not in st.session_state or st.session_state.user_id is None or st.s
                 st.session_state.user_id = str(uuid.uuid4())
                 st.session_state.username = "オフライン" + str(random.randint(10, 99))
             
-            # 作った記憶をCookieに保存して焼き付ける！
             cookies["user_id"] = st.session_state.user_id
             cookies["username"] = st.session_state.username
             cookies.save()
@@ -127,7 +123,7 @@ with c2:
         st.rerun()
 
 with st.expander(t("🔗 友達を招待・URLシェア", "🔗 Share with friends!")):
-    share_url = "https://ochify-world.streamlit.app/?embed=true"
+    share_url = "https://ochify-world.streamlit.app"
     share_text = t("Ochifyで大阪のお笑いコミュニケーションを体験しよう！😂", "Experience Osaka comedy communication on Ochify!😂")
     encoded_text = urllib.parse.quote(share_text)
     encoded_url = urllib.parse.quote(share_url)
@@ -331,7 +327,8 @@ elif page_index == 1:
             st.success(f"🎯 {st.session_state.my_goal}")
             for i, task in enumerate(st.session_state.ai_tasks): st.markdown(f"☑️ **Task {i+1}:** {task}")
             st.markdown('<div class="btn-ochify">', unsafe_allow_html=True)
-            if st.button(t("🔥 このタスクにコミットする！", "🔥 Commit!"), type="primary", use_container_width=True): st.session_state.yume_step = 3; st.rerun()
+            if st.button(t("🔥 このタスクにコミットする！", "🔥 Commit!"), type="primary", use_container_width=True):
+                st.session_state.yume_step = 3; st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
         elif st.session_state.yume_step == 3:
             st.write(f"**{st.session_state.my_goal}** ({t('期日', 'Deadline')}: {st.session_state.my_deadline})")
@@ -380,13 +377,14 @@ elif page_index == 1:
                             "boke_vector": st.session_state.preview_vector
                         }
                         res = requests.post(f"{API_URL}/api/publish", json=payload, timeout=10)
-                        if res.status_code == 200: success = True
+                        if res.status_code == 200:
+                            success = True
                         else: handle_api_error(res)
                     except Exception as e: st.error(f"通信エラー: {e}")
                 if success:
                     st.session_state.preview_data = None
                     st.session_state.preview_vector = None
-                    st.session_state.input_text = ""
+                    # 🚨 修正ポイント: ここにあった st.session_state.input_text = "" の強制リセットを完全に削除しました！
                     st.toast(t("🎉 投稿完了！", "🎉 Published!"), icon="✅")
                     time.sleep(1.5)
                     st.session_state.current_page = pages[0] 
@@ -412,7 +410,7 @@ elif page_index == 2:
                 else:
                     for i, post in enumerate(ranked_posts[:10]):
                         try: render_post_card(post, is_trend=True, rank=i+1)
-                        except: pass
+                        except Exception as e: pass
             else: handle_api_error(trend_res)
         except Exception as e: st.error(f"通信エラー: {e}")
 
@@ -488,14 +486,10 @@ elif page_index == 3:
                     except: pass
                     st.rerun()
 
-# ==========================================
-# 👤 マイページ
-# ==========================================
 elif page_index == 4:
     st.markdown(t("### 👤 マイページ", "### 👤 My Profile"))
     
-    # 🚨 【新機能】名前変更時にCookieとURLの両方を更新！
-    with st.expander(t("⚙️ アカウント設定（名前変更）", "⚙️ Account Settings"), expanded=True):
+    with st.expander(t("⚙️ アカウント設定（名前変更・復元）", "⚙️ Account Settings"), expanded=True):
         new_name = st.text_input(t("ニックネームを変更", "Change Nickname"), value=st.session_state.username)
         if st.button(t("名前を変更する", "Update Name"), type="primary"):
             if new_name and len(new_name.strip()) > 0:
@@ -504,13 +498,8 @@ elif page_index == 4:
                         res = requests.post(f"{API_URL}/api/update-user", json={"user_id": st.session_state.user_id, "new_name": new_name.strip()}, timeout=10)
                         if res.status_code == 200:
                             st.session_state.username = new_name.strip()
-                            # URLも更新
-                            try: st.query_params["uname"] = st.session_state.username
-                            except: pass
-                            # 🍪 Cookieも更新
                             cookies["username"] = st.session_state.username
                             cookies.save()
-                            
                             st.success(t("✅ ニックネームを変更しました！", "✅ Nickname updated!"))
                             time.sleep(1)
                             st.rerun()
@@ -527,23 +516,15 @@ elif page_index == 4:
                 if len(parts) == 2:
                     st.session_state.user_id = parts[0].strip()
                     st.session_state.username = parts[1].strip()
-                    try:
-                        st.query_params["uid"] = st.session_state.user_id
-                        st.query_params["uname"] = st.session_state.username
-                        st.query_params["embed"] = "true"
-                    except: pass
-                    # 🍪 復元した記憶もCookieに焼き付ける
                     cookies["user_id"] = st.session_state.user_id
                     cookies["username"] = st.session_state.username
                     cookies.save()
-                    
                     st.success(t("✅ 過去の自分を取り戻しました！", "✅ Restored!"))
                     time.sleep(1.5)
                     st.rerun()
 
     st.markdown("---")
     st.markdown(t("#### 📜 あなたの過去の投稿", "#### 📜 Your Past Posts"))
-    
     if st.button(t("🔄 履歴を更新", "🔄 Refresh History"), use_container_width=True): st.rerun()
     with st.spinner(t("読み込み中...", "Loading...")):
         try:
