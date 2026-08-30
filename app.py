@@ -4,14 +4,8 @@ import time
 import uuid
 import random
 import urllib.parse
-from streamlit_cookies_manager import EncryptedCookieManager
 
 st.set_page_config(page_title="Ochify | World Peace through Comedy", page_icon="🌎", layout="centered", initial_sidebar_state="collapsed")
-
-# 🚨 ブラウザのCookieを使って記憶を永続化
-cookies = EncryptedCookieManager(prefix="ochify", password="super_secret_password_for_ochify_2026")
-if not cookies.ready():
-    st.stop()
 
 st.markdown("""
 <style>
@@ -46,27 +40,19 @@ st.markdown("""
 API_URL = "https://ochify-api.onrender.com"
 
 if "user_id" not in st.session_state or st.session_state.user_id is None or st.session_state.user_id == "test_id":
-    if cookies.get("user_id"):
-        st.session_state.user_id = cookies.get("user_id")
-        st.session_state.username = cookies.get("username")
-    else:
-        with st.spinner("🚀 Booting..."):
-            try:
-                res = requests.post(f"{API_URL}/api/init-user", timeout=10)
-                if res.status_code == 200:
-                    data = res.json()
-                    st.session_state.user_id = data.get("user_id")
-                    st.session_state.username = data.get("username")
-                else:
-                    st.session_state.user_id = str(uuid.uuid4())
-                    st.session_state.username = "名無しユーザー" + str(random.randint(10, 99))
-            except:
+    with st.spinner("🚀 Booting..."):
+        try:
+            res = requests.post(f"{API_URL}/api/init-user", timeout=10)
+            if res.status_code == 200:
+                data = res.json()
+                st.session_state.user_id = data.get("user_id")
+                st.session_state.username = data.get("username")
+            else:
                 st.session_state.user_id = str(uuid.uuid4())
-                st.session_state.username = "オフライン" + str(random.randint(10, 99))
-            
-            cookies["user_id"] = st.session_state.user_id
-            cookies["username"] = st.session_state.username
-            cookies.save()
+                st.session_state.username = "名無しユーザー" + str(random.randint(10, 99))
+        except:
+            st.session_state.user_id = str(uuid.uuid4())
+            st.session_state.username = "オフライン" + str(random.randint(10, 99))
 
 if "lang" not in st.session_state: st.session_state.lang = "ja"
 if "current_page" not in st.session_state: st.session_state.current_page = "🌍 フィード" 
@@ -123,7 +109,7 @@ with c2:
         st.rerun()
 
 with st.expander(t("🔗 友達を招待・URLシェア", "🔗 Share with friends!")):
-    share_url = "https://ochify-world.streamlit.app"
+    share_url = "https://ochify-world.streamlit.app/?embed=true"
     share_text = t("Ochifyで大阪のお笑いコミュニケーションを体験しよう！😂", "Experience Osaka comedy communication on Ochify!😂")
     encoded_text = urllib.parse.quote(share_text)
     encoded_url = urllib.parse.quote(share_url)
@@ -384,10 +370,9 @@ elif page_index == 1:
                 if success:
                     st.session_state.preview_data = None
                     st.session_state.preview_vector = None
-                    # 🚨 修正ポイント: ここにあった st.session_state.input_text = "" の強制リセットを完全に削除しました！
-                    st.toast(t("🎉 投稿完了！", "🎉 Published!"), icon="✅")
+                    st.toast(t("🎉 投稿完了！閲覧者側フィードに移動します。", "🎉 Published! Moving to Feed."), icon="✅")
                     time.sleep(1.5)
-                    st.session_state.current_page = pages[0] 
+                    st.session_state.current_page = pages[0]
                     st.rerun()
             st.markdown('</div>', unsafe_allow_html=True)
         with c2:
@@ -498,8 +483,6 @@ elif page_index == 4:
                         res = requests.post(f"{API_URL}/api/update-user", json={"user_id": st.session_state.user_id, "new_name": new_name.strip()}, timeout=10)
                         if res.status_code == 200:
                             st.session_state.username = new_name.strip()
-                            cookies["username"] = st.session_state.username
-                            cookies.save()
                             st.success(t("✅ ニックネームを変更しました！", "✅ Nickname updated!"))
                             time.sleep(1)
                             st.rerun()
@@ -516,9 +499,6 @@ elif page_index == 4:
                 if len(parts) == 2:
                     st.session_state.user_id = parts[0].strip()
                     st.session_state.username = parts[1].strip()
-                    cookies["user_id"] = st.session_state.user_id
-                    cookies["username"] = st.session_state.username
-                    cookies.save()
                     st.success(t("✅ 過去の自分を取り戻しました！", "✅ Restored!"))
                     time.sleep(1.5)
                     st.rerun()
